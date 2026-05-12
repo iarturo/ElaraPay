@@ -1,0 +1,221 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Design Tokens ───────────────────────────────────── */
+:root {
+    --color-bg: #FAFAFA;
+    --color-surface: #FFFFFF;
+    --color-text: #1A1A1A;
+    --color-text-muted: #6B7280;
+    --color-accent: #2563EB;
+    --color-accent-soft: #EFF6FF;
+    --color-border: #E5E7EB;
+    --color-border-hover: #D1D5DB;
+    --radius-card: 16px;
+    --radius-button: 12px;
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.04);
+    --shadow-card-hover: 0 4px 20px rgba(0,0,0,0.08), 0 8px 30px rgba(0,0,0,0.06);
+    --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Reset & Base ────────────────────────────────────── */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+}
+
+/* ─── Typography ──────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+/* ─── Utility Animations ──────────────────────────────── */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+
+.animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out forwards;
+    opacity: 0;
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+    opacity: 0;
+}
+
+.animate-float {
+    animation: float 3s ease-in-out infinite;
+}
+
+/* Staggered animation delays for product cards */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
+.stagger-6 { animation-delay: 0.6s; }
+
+/* ─── Product Card ────────────────────────────────────── */
+.product-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    transition: all var(--transition-base);
+    overflow: hidden;
+}
+
+.product-card:hover {
+    box-shadow: var(--shadow-card-hover);
+    border-color: var(--color-border-hover);
+    transform: translateY(-4px);
+}
+
+.product-card:hover .product-image {
+    transform: scale(1.05);
+}
+
+.product-image {
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Badge ───────────────────────────────────────────── */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+.badge-new {
+    background: linear-gradient(135deg, #6366F1, #8B5CF6);
+    color: white;
+}
+
+.badge-bestseller {
+    background: linear-gradient(135deg, #F59E0B, #EF4444);
+    color: white;
+}
+
+.badge-limited {
+    background: linear-gradient(135deg, #EC4899, #F43F5E);
+    color: white;
+}
+
+/* ─── Size Selector ───────────────────────────────────── */
+.size-option {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1.5px solid var(--color-border);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all 200ms ease;
+    background: transparent;
+}
+
+.size-option:hover {
+    border-color: var(--color-text);
+    color: var(--color-text);
+}
+
+.size-option.active {
+    border-color: var(--color-text);
+    background: var(--color-text);
+    color: white;
+}
+
+/* ─── Custom scrollbar ────────────────────────────────── */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #D1D5DB;
+    border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #9CA3AF;
+}
+
+/* ─── OnchainKit Overrides ────────────────────────────── */
+.ock-font-family {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+}
+
+/* Force Connect Wallet button text to white */
+[data-testid="ockConnectWallet_Container"] button,
+[data-testid="ockConnectWallet_Container"] button span,
+[data-testid="ockConnectWallet_Container"] button *,
+.ock-connect-wallet span,
+.ock-connect-wallet button span {
+    color: white !important;
+}
+
+/* Force Connect Wallet loading spinner to blue */
+[data-testid="ockConnectWallet_Container"] button svg,
+[data-testid="ockConnectWallet_Container"] button svg path,
+[data-testid="ockConnectWallet_Container"] button svg circle,
+.ock-connect-wallet svg,
+.ock-connect-wallet svg path,
+.ock-connect-wallet svg circle {
+    stroke: #3B82F6 !important; /* Blue-500 */
+    fill: #3B82F6 !important;
+}
+
+/* If the spinner uses borders instead of SVG */
+[data-testid="ockConnectWallet_Container"] [class*="spinner"],
+.ock-connect-wallet [class*="spinner"] {
+    border-color: #3B82F6 !important;
+    border-bottom-color: transparent !important;
+    border-right-color: transparent !important;
+}
