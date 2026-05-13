@@ -114,13 +114,13 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
 
     const contracts = [
         {
-            address: USDC_SEPOLIA_ADDRESS as `0x${string}`,
+            address: USDC_SEPOLIA_ADDRESS,
             abi: USDC_ABI,
             functionName: 'approve' as const,
             args: [GATEWAY_ADDRESS, priceInDecimals] as const,
         },
         {
-            address: GATEWAY_ADDRESS as `0x${string}`,
+            address: GATEWAY_ADDRESS,
             abi: GATEWAY_ABI,
             functionName: 'payForOrder' as const,
             args: [priceInDecimals, `${product.id}-${selectedSize}`] as const,
@@ -204,6 +204,10 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
                     contracts={contracts}
                     className="w-full"
                     chainId={84532}
+                    onSuccess={(response) => {
+                        console.log("¡Pago exitoso! Hash:", response.transactionReceipts[0].transactionHash);
+                        // Aquí en el futuro puedes disparar un modal o limpiar la selección
+                    }}
                 >
                     <TransactionButton
                         className="w-full bg-gray-900 text-white hover:bg-gray-800 rounded-xl py-3 text-sm font-medium transition-all duration-200 hover:shadow-lg"
@@ -457,7 +461,7 @@ export default function Home() {
                         </div>
                         <span className="text-sm font-semibold text-gray-900">ÉLARA</span>
                         <span className="text-xs text-gray-400 ml-2">
-                            © {new Date().getFullYear()}
+                            © 2026
                         </span>
                     </div>
 

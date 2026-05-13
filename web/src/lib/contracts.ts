@@ -3,12 +3,12 @@
 // Addresses are loaded from environment variables for safe mainnet/testnet switching.
 // Fallback to Base Sepolia addresses for development.
 export const GATEWAY_ADDRESS =
-    process.env.NEXT_PUBLIC_GATEWAY_ADDRESS ||
-    "0x01bC3576301bB012458f9B1aED30Ecf435F72BCe";
+    (process.env.NEXT_PUBLIC_GATEWAY_ADDRESS ||
+    "0x01bC3576301bB012458f9B1aED30Ecf435F72BCe") as `0x${string}`;
 
 export const USDC_SEPOLIA_ADDRESS =
-    process.env.NEXT_PUBLIC_USDC_ADDRESS ||
-    "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+    (process.env.NEXT_PUBLIC_USDC_ADDRESS ||
+    "0x036CbD53842c5426634e7929541eC2318f3dCF7e") as `0x${string}`;
 
 // The ABI: The instruction manual so your web app knows which functions exist
 export const GATEWAY_ABI = [
