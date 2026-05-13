@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/base-org/brand-kit/main/logo/wordmark/Base_Wordmark_Blue.svg" alt="Built on Base" width="160" />
-</p>
-
 <h1 align="center">BasePaymentGateway</h1>
 
 <p align="center">
