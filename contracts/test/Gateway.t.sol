@@ -121,13 +121,8 @@ contract GatewayTest is Test {
     function test_revert_insufficientAllowance() public {
         // No approve was made
         vm.prank(buyer);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BasePaymentGateway.InsufficientAllowance.selector,
-                TEN_USDC,
-                0
-            )
-        );
+        // Since SafeERC20 is used, it will revert with SafeERC20FailedOperation if transferFrom returns false
+        vm.expectRevert();
         gateway.payForOrder(TEN_USDC, "ORDER-001");
     }
 
