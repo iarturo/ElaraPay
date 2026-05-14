@@ -29,7 +29,7 @@ This project is a working proof of concept: a premium e-commerce storefront (**�
 ## Live Demo
 
 > **Network:** Base Sepolia Testnet  
-> **Contract:** [`0x01bC3576301bB012458f9B1aED30Ecf435F72BCe`](https://sepolia.basescan.org/address/0x01bC3576301bB012458f9B1aED30Ecf435F72BCe)
+> **Contract:** [`0xAB87C048805DCc643C4C6aa30E98F1B3E75C10c9`](https://sepolia.basescan.org/address/0xAB87C048805DCc643C4C6aa30E98F1B3E75C10c9)
 
 ---
 
@@ -167,18 +167,21 @@ function payForOrder(uint256 amount, string calldata orderId) external {
     // ── Checks ──
     if (amount == 0) revert ZeroAmount();
     if (bytes(orderId).length == 0) revert EmptyOrderId();
-    if (orderFulfilled[orderId]) revert OrderAlreadyPaid(orderId);
+
+    bytes32 id = keccak256(bytes(orderId));
+    if (orderFulfilled[id]) revert OrderAlreadyPaid(orderId);
 
     uint256 allowed = usdc.allowance(msg.sender, address(this));
     if (allowed < amount) revert InsufficientAllowance(amount, allowed);
 
     // ── Effects (state change BEFORE external call — CEI) ──
-    orderFulfilled[orderId] = true;
-    emit PaymentReceived(msg.sender, orderId, amount);
+    orderFulfilled[id] = true;
 
     // ── Interactions (external call LAST) ──
     bool success = usdc.transferFrom(msg.sender, owner, amount);
     if (!success) revert TransferFailed();
+
+    emit PaymentReceived(msg.sender, orderId, amount);
 }
 ```
 
