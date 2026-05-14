@@ -1,6 +1,6 @@
 'use client';
 
-import { GATEWAY_ADDRESS, GATEWAY_ABI, USDC_SEPOLIA_ADDRESS, ACTIVE_CHAIN } from '@/lib/contracts';
+import { GATEWAY_ADDRESS, GATEWAY_ABI, USDC_ADDRESS, ACTIVE_CHAIN } from '@/lib/contracts';
 import {
     ConnectWallet,
     Wallet,
@@ -121,7 +121,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
 
     const contracts = [
         {
-            address: USDC_SEPOLIA_ADDRESS,
+            address: USDC_ADDRESS,
             abi: USDC_ABI,
             functionName: 'approve' as const,
             args: [GATEWAY_ADDRESS, priceInDecimals] as const,
