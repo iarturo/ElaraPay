@@ -13,6 +13,8 @@ contract DeployGateway is Script {
         // Change to 0x036CbD53842c5426634e7929541eC2318f3dCF7e for Base Sepolia
         address usdcAddress = vm.envAddress("USDC_ADDRESS");
 
+        console.log("Deploying to chain ID:", block.chainid);
+
         vm.startBroadcast(deployerPrivateKey);
 
         BasePaymentGateway gateway = new BasePaymentGateway(usdcAddress);

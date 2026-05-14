@@ -1,5 +1,7 @@
 // src/lib/contracts.ts
+import { base, baseSepolia } from 'viem/chains';
 
+export const ACTIVE_CHAIN = process.env.NEXT_PUBLIC_CHAIN === 'mainnet' ? base : baseSepolia;
 // Addresses are loaded from environment variables for safe mainnet/testnet switching.
 // Fallback to Base Sepolia addresses for development.
 export const GATEWAY_ADDRESS =

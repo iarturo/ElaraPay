@@ -1,6 +1,6 @@
 'use client';
 
-import { GATEWAY_ADDRESS, GATEWAY_ABI, USDC_SEPOLIA_ADDRESS } from '@/lib/contracts';
+import { GATEWAY_ADDRESS, GATEWAY_ABI, USDC_SEPOLIA_ADDRESS, ACTIVE_CHAIN } from '@/lib/contracts';
 import {
     ConnectWallet,
     Wallet,
@@ -16,7 +16,7 @@ import {
     TransactionStatusLabel,
 } from '@coinbase/onchainkit/transaction';
 import { parseUnits } from 'viem';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 
 /* ─── ERC-20 Approve ABI ─────────────────────────────── */
@@ -110,7 +110,14 @@ const PRODUCTS: Product[] = [
 /* ─── Product Card Component ──────────────────────────── */
 function ProductCard({ product, index }: { product: Product; index: number }) {
     const [selectedSize, setSelectedSize] = useState(product.sizes[1] || product.sizes[0]);
+    const [orderId, setOrderId] = useState(() => `${product.id}-${selectedSize}-${Date.now()}`);
+
     const priceInDecimals = parseUnits(product.price, 6);
+
+    // regenera el ID cuando cambias de talla
+    useEffect(() => {
+        setOrderId(`${product.id}-${selectedSize}-${Date.now()}`);
+    }, [selectedSize, product.id]);
 
     const contracts = [
         {
@@ -123,7 +130,7 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
             address: GATEWAY_ADDRESS,
             abi: GATEWAY_ABI,
             functionName: 'payForOrder' as const,
-            args: [priceInDecimals, `${product.id}-${selectedSize}`] as const,
+            args: [priceInDecimals, orderId] as const, // ← ahora usa el estado
         },
     ];
 
@@ -203,10 +210,11 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
                 <Transaction
                     contracts={contracts}
                     className="w-full"
-                    chainId={84532}
+                    chainId={ACTIVE_CHAIN.id}
                     onSuccess={(response) => {
                         console.log("¡Pago exitoso! Hash:", response.transactionReceipts[0].transactionHash);
-                        // Aquí en el futuro puedes disparar un modal o limpiar la selección
+                        // genera un nuevo ID para la próxima compra
+                        setOrderId(`${product.id}-${selectedSize}-${Date.now()}`);
                     }}
                 >
                     <TransactionButton
