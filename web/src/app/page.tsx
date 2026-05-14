@@ -114,7 +114,6 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
 
     const priceInDecimals = parseUnits(product.price, 6);
 
-    // regenera el ID cuando cambias de talla
     useEffect(() => {
         setOrderId(`${product.id}-${selectedSize}-${Date.now()}`);
     }, [selectedSize, product.id]);
@@ -130,13 +129,12 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
             address: GATEWAY_ADDRESS,
             abi: GATEWAY_ABI,
             functionName: 'payForOrder' as const,
-            args: [priceInDecimals, orderId] as const, // ← ahora usa el estado
+            args: [priceInDecimals, orderId] as const,
         },
     ];
 
     return (
         <div className={`product-card animate-fade-in-up stagger-${index + 1}`}>
-            {/* Image Container */}
             <div className="relative overflow-hidden bg-[#F8F8F8] aspect-[4/5]">
                 <Image
                     src={product.image}
@@ -154,16 +152,14 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
                 )}
             </div>
 
-            {/* Content */}
             <div className="p-5">
-                {/* Header */}
                 <div className="flex items-start justify-between gap-2 mb-2">
                     <h3 className="text-base font-semibold text-gray-900 leading-tight">
                         {product.name}
                     </h3>
                     <span className="text-base font-semibold text-gray-900 whitespace-nowrap">
                         ${product.price}
-                        <span className="text-[10px] font-normal text-gray-400 ml-0.5">USDC</span>
+                        <span className="text- font-normal text-gray-400 ml-0.5">USDC</span>
                     </span>
                 </div>
 
@@ -171,7 +167,6 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
                     {product.description}
                 </p>
 
-                {/* Size Selector */}
                 <div className="mb-4">
                     <span className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2 block">
                         Size
@@ -189,7 +184,6 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
                     </div>
                 </div>
 
-                {/* Color Swatches */}
                 <div className="mb-5">
                     <span className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2 block">
                         Color
@@ -206,14 +200,12 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
                     </div>
                 </div>
 
-                {/* Pay Button */}
                 <Transaction
                     contracts={contracts}
                     className="w-full"
                     chainId={ACTIVE_CHAIN.id}
                     onSuccess={(response) => {
                         console.log("¡Pago exitoso! Hash:", response.transactionReceipts[0].transactionHash);
-                        // genera un nuevo ID para la próxima compra
                         setOrderId(`${product.id}-${selectedSize}-${Date.now()}`);
                     }}
                 >
@@ -233,14 +225,22 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
 
 /* ─── Main Page ───────────────────────────────────────── */
 export default function Home() {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) {
+        return <div className="min-h-screen bg-[#FAFAFA]" />;
+    }
+
     return (
         <div className="min-h-screen bg-[#FAFAFA]">
-
-            {/* ═══ Navigation ═══ */}
+            {/* Navigation */}
             <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100">
                 <div className="max-w-7xl mx-auto px-6 lg:px-8">
                     <div className="flex items-center justify-between h-16">
-                        {/* Logo */}
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
                                 <span className="text-white font-bold text-sm">É</span>
@@ -250,7 +250,6 @@ export default function Home() {
                             </span>
                         </div>
 
-                        {/* Navigation Links */}
                         <div className="hidden md:flex items-center gap-8">
                             <a href="#collection" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
                                 Collection
@@ -263,14 +262,13 @@ export default function Home() {
                             </a>
                         </div>
 
-                        {/* Wallet Connect */}
                         <div className="flex items-center gap-3">
                             <div className="hidden sm:flex items-center gap-1.5 text-xs text-gray-400 mr-2">
                                 <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                                 Base Sepolia
                             </div>
                             <Wallet>
-                                <ConnectWallet className="!bg-gray-900 !text-white !rounded-xl !px-4 !py-2 !text-sm !font-medium hover:!bg-gray-800 !transition-all !duration-200 !border-0">
+                                <ConnectWallet className="!bg-gray-900!text-white!rounded-xl!px-4!py-2!text-sm!font-medium hover:!bg-gray-800!transition-all!duration-200!border-0">
                                     <Avatar className="h-5 w-5" />
                                     <Name />
                                 </ConnectWallet>
@@ -288,16 +286,14 @@ export default function Home() {
                 </div>
             </nav>
 
-            {/* ═══ Hero Section ═══ */}
+            {/* Hero Section */}
             <section className="relative overflow-hidden">
-                {/* Subtle gradient background */}
                 <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-white to-blue-50/30" />
-                <div className="absolute top-20 right-20 w-[500px] h-[500px] bg-gradient-to-br from-violet-100/40 to-rose-100/40 rounded-full blur-3xl" />
-                <div className="absolute bottom-0 left-20 w-[400px] h-[400px] bg-gradient-to-tr from-blue-100/30 to-cyan-100/30 rounded-full blur-3xl" />
+                <div className="absolute top-20 right-20 w- h- bg-gradient-to-br from-violet-100/40 to-rose-100/40 rounded-full blur-3xl" />
+                <div className="absolute bottom-0 left-20 w- h- bg-gradient-to-tr from-blue-100/30 to-cyan-100/30 rounded-full blur-3xl" />
 
                 <div className="relative max-w-7xl mx-auto px-6 lg:px-8 pt-12 pb-0 md:pt-16 md:pb-0">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                        {/* Left — Text */}
                         <div>
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-full border border-gray-200 shadow-sm mb-6 animate-fade-in">
                                 <div className="w-2 h-2 bg-blue-500 rounded-full" />
@@ -334,10 +330,8 @@ export default function Home() {
                             </div>
                         </div>
 
-                        {/* Right — Model Image */}
                         <div className="relative flex justify-center items-end animate-fade-in-up stagger-3">
                             <div className="relative w-full max-w-md mx-auto">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                     src="/products/hero-model.png"
                                     alt="Woman wearing ÉLARA premium t-shirt"
@@ -352,7 +346,7 @@ export default function Home() {
                 </div>
             </section>
 
-            {/* ═══ Trust Bar ═══ */}
+            {/* Trust Bar */}
             <section className="border-y border-gray-100 bg-white">
                 <div className="max-w-7xl mx-auto px-6 lg:px-8 py-5">
                     <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm text-gray-900 font-medium">
@@ -379,9 +373,8 @@ export default function Home() {
                 </div>
             </section>
 
-            {/* ═══ Product Grid ═══ */}
+            {/* Product Grid */}
             <section id="collection" className="max-w-7xl mx-auto px-6 lg:px-8 py-16 md:py-24">
-                {/* Section Header */}
                 <div className="text-center mb-14">
                     <span className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400 mb-3 block">
                         Spring / Summer 2026
@@ -394,7 +387,6 @@ export default function Home() {
                     </p>
                 </div>
 
-                {/* Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
                     {PRODUCTS.map((product, i) => (
                         <ProductCard key={product.id} product={product} index={i} />
@@ -402,7 +394,7 @@ export default function Home() {
                 </div>
             </section>
 
-            {/* ═══ How It Works ═══ */}
+            {/* How It Works */}
             <section className="bg-white border-y border-gray-100">
                 <div className="max-w-7xl mx-auto px-6 lg:px-8 py-16 md:py-24">
                     <div className="text-center mb-14">
@@ -460,7 +452,7 @@ export default function Home() {
                 </div>
             </section>
 
-            {/* ═══ Footer ═══ */}
+            {/* Footer */}
             <footer className="max-w-7xl mx-auto px-6 lg:px-8 py-12">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="flex items-center gap-3">

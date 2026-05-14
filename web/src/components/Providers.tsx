@@ -11,6 +11,7 @@ import { useState } from 'react';
 
 const wagmiConfig = createConfig({
     chains: [base, baseSepolia],
+    ssr: true,
     connectors: [
         coinbaseWallet({
             appName: 'Base Payment Gateway',

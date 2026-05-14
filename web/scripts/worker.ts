@@ -1,46 +1,64 @@
-// web/src/scripts/worker.ts
-import { createPublicClient, http, parseAbiItem } from 'viem';
-import { base, baseSepolia } from 'viem/chains';
-import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+// web/scripts/worker.ts
+import { createPublicClient, http, webSocket, parseAbiItem } from 'viem'
+import { base, baseSepolia } from 'viem/chains'
+import { createClient } from '@supabase/supabase-js'
+import * as dotenv from 'dotenv'
+import ws from 'ws'
 
-// En producción, asegúrate de tener ALCHEMY_RPC_URL en tu .env.local
-const ALCHEMY_URL = process.env.ALCHEMY_RPC_URL;
+// Load env
+dotenv.config({ path: '.env.local' })
 
-const ACTIVE_CHAIN = process.env.NEXT_PUBLIC_CHAIN === 'mainnet' ? base : baseSepolia;
-const GATEWAY_ADDRESS = process.env.NEXT_PUBLIC_GATEWAY_ADDRESS || "0x01bC3576301bB012458f9B1aED30Ecf435F72BCe";
+    // Fix for Node 20 WebSocket
+    ; (global as any).WebSocket = ws
 
+// --- Config ---
+const ALCHEMY_URL = process.env.ALCHEMY_RPC_URL
+const ACTIVE_CHAIN = process.env.NEXT_PUBLIC_CHAIN === 'mainnet' ? base : baseSepolia
+const GATEWAY_ADDRESS = process.env.NEXT_PUBLIC_GATEWAY_ADDRESS as `0x${string}`
+
+const supabase = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_KEY!
+)
+
+// --- Use WebSocket if URL starts with wss ---
 const client = createPublicClient({
     chain: ACTIVE_CHAIN,
-    transport: http(ALCHEMY_URL), // Si es undefined, usará el public RPC (puede tener límites de rate)
-});
+    transport: ALCHEMY_URL?.startsWith('wss')
+        ? webSocket(ALCHEMY_URL)        // <-- AQUÍ va la línea
+        : http(ALCHEMY_URL || undefined),
+})
 
-console.log(`📡 Iniciando worker para escuchar pagos en ${ACTIVE_CHAIN.name}...`);
-console.log(`Contrato: ${GATEWAY_ADDRESS}`);
+console.log(`📡 ÉLARA Worker listening on ${ACTIVE_CHAIN.name}`)
+console.log(`Contract: ${GATEWAY_ADDRESS}`)
 
 const unwatch = client.watchEvent({
-    address: GATEWAY_ADDRESS as `0x${string}`,
+    address: GATEWAY_ADDRESS,
     event: parseAbiItem('event PaymentReceived(address indexed buyer, string orderId, uint256 amount)'),
-    onLogs: logs => {
+    onLogs: async (logs) => {
         for (const log of logs) {
-            const { buyer, orderId, amount } = log.args;
-            console.log('\n✅ ¡NUEVO PAGO RECIBIDO!');
-            console.log(`   Comprador: ${buyer}`);
-            console.log(`   Orden: ${orderId}`);
-            console.log(`   Monto: ${Number(amount) / 1e6} USDC`);
-            console.log(`   TxHash: ${log.transactionHash}`);
-            
-            // TODO: Aquí debes conectar con tu base de datos (Postgres, Firebase, MongoDB)
-            // y marcar la orden como "PAGADA" para que se procese el envío.
-            // db.orders.update({ id: orderId }, { status: 'PAID', txHash: log.transactionHash });
+            const { buyer, orderId, amount } = log.args
+            console.log('\n✅ PAYMENT RECEIVED!')
+            console.log(`  Order: ${orderId}`)
+            console.log(`  Amount: ${Number(amount) / 1e6} USDC`)
+
+            await supabase.from('orders').upsert({
+                id: orderId,
+                buyer: buyer?.toLowerCase(),
+                amount: Number(amount) / 1e6,
+                status: 'PAID',
+                tx_hash: log.transactionHash,
+                paid_at: new Date().toISOString(),
+                chain_id: ACTIVE_CHAIN.id
+            }, { onConflict: 'id' })
+
+            console.log('💾 Saved to Supabase')
         }
     },
-    onError: error => console.error('Error escuchando eventos:', error)
-});
+    onError: (error) => console.error('Watcher Error:', error)
+})
 
-// Mantener el proceso vivo
 process.on('SIGINT', () => {
-    console.log("Deteniendo worker...");
-    unwatch();
-    process.exit();
-});
+    unwatch()
+    process.exit(0)
+})
