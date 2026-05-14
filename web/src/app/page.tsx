@@ -99,7 +99,7 @@ const PRODUCTS: Product[] = [
         id: 'ORD-1006',
         name: 'Maritime Stripe Tee',
         description: 'Classic navy with crisp white sleeve stripes. Timeless nautical elegance reimagined.',
-        price: '24',
+        price: '1',
         image: '/products/tshirt-navy-stripe.png',
         badge: 'bestseller',
         sizes: ['XS', 'S', 'M', 'L', 'XL'],
