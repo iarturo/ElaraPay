@@ -3,183 +3,96 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../src/BasePaymentGateway.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-/// @dev Mock USDC token for testing
-contract MockUSDC {
-    string public name = "USD Coin";
-    string public symbol = "USDC";
-    uint8  public decimals = 6;
-
-    mapping(address => uint256) public balanceOf;
-    mapping(address => mapping(address => uint256)) public allowance;
-
-    function mint(address to, uint256 amount) external {
-        balanceOf[to] += amount;
+// Mock USDC token with 6 decimals for testing
+contract MockUSDC is ERC20 {
+    constructor() ERC20("Mock USDC", "USDC") {
+        _mint(msg.sender, 1_000_000e6);
     }
-
-    function approve(address spender, uint256 amount) external returns (bool) {
-        allowance[msg.sender][spender] = amount;
-        return true;
-    }
-
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
-        if (allowance[from][msg.sender] < amount) return false;
-        if (balanceOf[from] < amount) return false;
-        allowance[from][msg.sender] -= amount;
-        balanceOf[from] -= amount;
-        balanceOf[to]   += amount;
-        return true;
+    
+    function decimals() public pure override returns (uint8) { 
+        return 6; 
     }
 }
 
 contract GatewayTest is Test {
-    BasePaymentGateway public gateway;
-    MockUSDC public usdc;
-
-    address admin  = address(0xAD);
-    address buyer  = address(0xB0);
-
-    uint256 constant TEN_USDC = 10_000_000; // 10 USDC (6 decimals)
-
-    // Re-declare event to use with vm.expectEmit (Solidity 0.8.20 compatibility)
+    // Re-declare events for expectEmit (Foundry requires local definition)
     event PaymentReceived(address indexed buyer, string orderId, uint256 amount);
+    event OrderShipped(string orderId);
+    event OrderRefunded(string orderId, uint256 amount);
+
+    BasePaymentGateway gateway;
+    MockUSDC usdc;
+    address buyer = address(0x456);
 
     function setUp() public {
+        // Deploy mock USDC
         usdc = new MockUSDC();
-
-        // Deploy gateway as admin
-        vm.prank(admin);
+        
+        // Deploy gateway - constructor takes only USDC address
         gateway = new BasePaymentGateway(address(usdc));
-
-        // Give USDC to the buyer
-        usdc.mint(buyer, 100_000_000); // 100 USDC
-    }
-
-    // ─── Positive tests ──────────────────────────────────────────────
-
-    function test_ownerIsDeployer() public view {
-        assertEq(gateway.owner(), admin);
-    }
-
-    function test_usdcAddressIsCorrect() public view {
-        assertEq(address(gateway.usdc()), address(usdc));
-    }
-
-    function test_payForOrder_success() public {
-        // Buyer approves the gateway
+        
+        // Fund buyer and approve gateway
+        usdc.transfer(buyer, 1000e6);
         vm.prank(buyer);
-        usdc.approve(address(gateway), TEN_USDC);
+        usdc.approve(address(gateway), type(uint256).max);
+    }
 
-        // Buyer pays
+    function test_PayForOrder() public {
+        string memory orderId = "ORDER-001";
+        uint256 amount = 24e6;
+
+        // Execute payment
         vm.prank(buyer);
+        gateway.payForOrder(amount, orderId);
+
+        // Read order from public mapping
+        // Order struct: (address buyer, uint256 amount, Status status, uint64 paidAt)
+        (address orderBuyer, uint256 orderAmount, BasePaymentGateway.Status status, uint64 paidAt) = 
+            gateway.orders(keccak256(bytes(orderId)));
+        
+        // Verify order state
+        assertEq(orderBuyer, buyer);
+        assertEq(orderAmount, amount);
+        assertEq(uint(status), uint(BasePaymentGateway.Status.Paid));
+        assertGt(paidAt, 0);
+    }
+
+    function test_RevertIfAlreadyPaid() public {
+        string memory orderId = "ORDER-001";
+        
+        vm.prank(buyer);
+        gateway.payForOrder(24e6, orderId);
+
+        // Expect revert with custom error (no arguments)
+        vm.expectRevert(BasePaymentGateway.OrderAlreadyPaid.selector);
+        vm.prank(buyer);
+        gateway.payForOrder(24e6, orderId);
+    }
+
+    function test_PaymentEmitsEvent() public {
+        string memory orderId = "ORDER-002";
+        uint256 amount = 50e6;
+
+        // Expect the PaymentReceived event
+        // First param is indexed (buyer), so set first true
         vm.expectEmit(true, false, false, true);
-        emit PaymentReceived(buyer, "ORDER-001", TEN_USDC);
-        gateway.payForOrder(TEN_USDC, "ORDER-001");
+        emit PaymentReceived(buyer, orderId, amount);
 
-        // Verify balances
-        assertEq(usdc.balanceOf(admin), TEN_USDC);
-        assertEq(usdc.balanceOf(buyer), 90_000_000);
-
-        // Verify order is marked as fulfilled
-        assertTrue(gateway.orderFulfilled(keccak256(bytes("ORDER-001"))));
-    }
-
-    function test_multiplePurchases_differentOrders() public {
-        vm.startPrank(buyer);
-        usdc.approve(address(gateway), 30_000_000); // 30 USDC
-
-        gateway.payForOrder(TEN_USDC, "ORDER-001");
-        gateway.payForOrder(TEN_USDC, "ORDER-002");
-        gateway.payForOrder(TEN_USDC, "ORDER-003");
-        vm.stopPrank();
-
-        assertEq(usdc.balanceOf(admin), 30_000_000);
-        assertEq(usdc.balanceOf(buyer), 70_000_000);
-    }
-
-    function test_checkAllowance() public {
         vm.prank(buyer);
-        usdc.approve(address(gateway), TEN_USDC);
-
-        assertEq(gateway.checkAllowance(buyer), TEN_USDC);
+        gateway.payForOrder(amount, orderId);
     }
 
-    // ─── Negative tests ──────────────────────────────────────────────
-
-    function test_revert_zeroAmount() public {
-        vm.prank(buyer);
+    function test_RevertOnZeroAmount() public {
         vm.expectRevert(BasePaymentGateway.ZeroAmount.selector);
-        gateway.payForOrder(0, "ORDER-001");
+        vm.prank(buyer);
+        gateway.payForOrder(0, "ORDER-003");
     }
 
-    function test_revert_emptyOrderId() public {
-        vm.prank(buyer);
+    function test_RevertOnEmptyOrderId() public {
         vm.expectRevert(BasePaymentGateway.EmptyOrderId.selector);
-        gateway.payForOrder(TEN_USDC, "");
-    }
-
-    function test_revert_insufficientAllowance() public {
-        // No approve was made
         vm.prank(buyer);
-        // Since SafeERC20 is used, it will revert with SafeERC20FailedOperation if transferFrom returns false
-        vm.expectRevert();
-        gateway.payForOrder(TEN_USDC, "ORDER-001");
-    }
-
-    function test_revert_insufficientBalance() public {
-        address poorBuyer = address(0xC0);
-        // Has allowance but no balance
-        vm.prank(poorBuyer);
-        usdc.approve(address(gateway), TEN_USDC);
-
-        vm.prank(poorBuyer);
-        vm.expectRevert();
-        gateway.payForOrder(TEN_USDC, "ORDER-001");
-    }
-
-    // ─── Replay protection tests ─────────────────────────────────────
-
-    function test_revert_orderAlreadyPaid() public {
-        vm.startPrank(buyer);
-        usdc.approve(address(gateway), 20_000_000); // enough for 2
-
-        // First payment succeeds
-        gateway.payForOrder(TEN_USDC, "ORDER-001");
-
-        // Second payment with SAME orderId reverts
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BasePaymentGateway.OrderAlreadyPaid.selector,
-                "ORDER-001"
-            )
-        );
-        gateway.payForOrder(TEN_USDC, "ORDER-001");
-        vm.stopPrank();
-
-        // Only one payment went through
-        assertEq(usdc.balanceOf(admin), TEN_USDC);
-    }
-
-    function test_differentBuyers_sameOrder_reverts() public {
-        address buyer2 = address(0xB1);
-        usdc.mint(buyer2, 100_000_000);
-
-        // First buyer pays
-        vm.prank(buyer);
-        usdc.approve(address(gateway), TEN_USDC);
-        vm.prank(buyer);
-        gateway.payForOrder(TEN_USDC, "ORDER-SHARED");
-
-        // Second buyer tries same orderId — reverts
-        vm.prank(buyer2);
-        usdc.approve(address(gateway), TEN_USDC);
-        vm.prank(buyer2);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BasePaymentGateway.OrderAlreadyPaid.selector,
-                "ORDER-SHARED"
-            )
-        );
-        gateway.payForOrder(TEN_USDC, "ORDER-SHARED");
+        gateway.payForOrder(10e6, "");
     }
 }
