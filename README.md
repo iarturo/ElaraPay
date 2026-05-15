@@ -1,4 +1,4 @@
-<h1 align="center">BasePaymentGateway</h1>
+<h1 align="center">ElaraPay</h1>
 
 <p align="center">
   <strong>A non-custodial USDC payment gateway built natively on Base.</strong><br/>
