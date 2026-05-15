@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-    title: "ÉLARA — Premium Women's T-Shirts | Pay with Crypto",
+    title: "ELARA — Premium Women's T-Shirts | Pay with Crypto",
     description: "Discover handcrafted women's t-shirts designed for the modern woman. Pay seamlessly with USDC on Base.",
     keywords: ["women's t-shirts", "premium clothing", "crypto payments", "USDC", "Base blockchain"],
 };

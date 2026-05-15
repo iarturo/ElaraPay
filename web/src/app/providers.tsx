@@ -21,7 +21,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     const config = createConfig({
         chains: [baseSepolia, base],
         connectors: [coinbaseWallet({
-            appName: 'ÉLARA',
+            appName: 'ELARA',
             preference: 'smartWalletOnly'
         })],
         transports: {
@@ -42,7 +42,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
                 background: '#0a0a0a',
                 color: 'white'
             }}>
-                Loading ÉLARA...
+                Loading ELARA...
             </div>
         )
     }

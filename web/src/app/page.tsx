@@ -242,11 +242,11 @@ export default function Home() {
                 <div className="max-w-7xl mx-auto px-6 lg:px-8">
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
-                                <span className="text-white font-bold text-sm">É</span>
+                            <div className="w-40 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
+                                <span className="text-white font-bold text-sm">ELARAPAY</span>
                             </div>
                             <span className="text-lg font-semibold tracking-tight text-gray-900">
-                                ÉLARA
+                                ELARA
                             </span>
                         </div>
 
@@ -334,7 +334,7 @@ export default function Home() {
                             <div className="relative w-full max-w-md mx-auto">
                                 <img
                                     src="/products/hero-model.png"
-                                    alt="Woman wearing ÉLARA premium t-shirt"
+                                    alt="Woman wearing ELARA premium t-shirt"
                                     width="500"
                                     height="600"
                                     style={{ width: '100%', height: 'auto', display: 'block' }}
@@ -459,7 +459,7 @@ export default function Home() {
                         <div className="w-7 h-7 bg-gray-900 rounded-lg flex items-center justify-center">
                             <span className="text-white font-bold text-xs">É</span>
                         </div>
-                        <span className="text-sm font-semibold text-gray-900">ÉLARA</span>
+                        <span className="text-sm font-semibold text-gray-900">ELARA</span>
                         <span className="text-xs text-gray-400 ml-2">
                             © 2026
                         </span>

@@ -23,7 +23,7 @@ Traditional payment processors charge **2.9% + $0.30 per transaction**, enforce 
 
 **BasePaymentGateway eliminates all of that.** It routes USDC payments directly from a customer's wallet to the merchant's wallet in a single atomic transaction — no middlemen, no custody, instant settlement. It's the payment infrastructure that Base was built for.
 
-This project is a working proof of concept: a premium e-commerce storefront (**ÉLARA**) that accepts USDC payments on Base through a smart contract, using **Coinbase OnchainKit** for wallet connectivity, **Circle's USDC** as the settlement currency, and a **Node.js + Supabase worker** to track and index orders automatically.
+This project is a working proof of concept: a premium e-commerce storefront (**ELARA**) that accepts USDC payments on Base through a smart contract, using **Coinbase OnchainKit** for wallet connectivity, **Circle's USDC** as the settlement currency, and a **Node.js + Supabase worker** to track and index orders automatically.
 
 ---
 
@@ -53,7 +53,7 @@ This project is a working proof of concept: a premium e-commerce storefront (**�
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│                     ÉLARA Storefront                     │
+│                     ELARA Storefront                     │
 │               (Next.js + OnchainKit + wagmi)             │
 │                                                          │
 │  ┌──────────┐    ┌──────────────┐    ┌───────────────┐  │
@@ -151,7 +151,7 @@ Base/
 ├── web/                          # Next.js storefront
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── page.tsx              # Main storefront (ÉLARA)
+│   │   │   ├── page.tsx              # Main storefront (ELARA)
 │   │   │   ├── layout.tsx            # Root layout with Providers
 │   │   │   └── globals.css           # Design system + animations
 │   │   ├── components/

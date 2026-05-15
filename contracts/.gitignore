@@ -13,3 +13,8 @@ lib/
 # ─── OS ───────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+# Python
+venv/
+__pycache__/
+.env

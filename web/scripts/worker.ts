@@ -29,7 +29,7 @@ const client = createPublicClient({
         : http(ALCHEMY_URL || undefined),
 })
 
-console.log(`📡 ÉLARA Worker listening on ${ACTIVE_CHAIN.name}`)
+console.log(`📡 ELARA Worker listening on ${ACTIVE_CHAIN.name}`)
 console.log(`Contract: ${GATEWAY_ADDRESS}`)
 
 const unwatch = client.watchEvent({
