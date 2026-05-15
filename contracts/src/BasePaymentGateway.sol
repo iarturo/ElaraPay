@@ -6,8 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract BasePaymentGateway is Ownable2Step, Pausable {
+contract BasePaymentGateway is Ownable2Step, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     IERC20 public immutable usdc;
 
@@ -32,14 +33,14 @@ contract BasePaymentGateway is Ownable2Step, Pausable {
         _pay(amount, orderId);
     }
 
-    function _pay(uint256 amount, string calldata orderId) internal {
+    function _pay(uint256 amount, string calldata orderId) internal nonReentrant {
         if (amount==0) revert ZeroAmount();
         if (bytes(orderId).length==0) revert EmptyOrderId();
         bytes32 id = keccak256(bytes(orderId));
         if (orders[id].status!= Status.None) revert OrderAlreadyPaid();
         orders[id] = Order(msg.sender, amount, Status.Paid, uint64(block.timestamp));
-        usdc.safeTransferFrom(msg.sender, owner(), amount);
         emit PaymentReceived(msg.sender, orderId, amount);
+        usdc.safeTransferFrom(msg.sender, owner(), amount);
     }
 
     // --- admin ---
@@ -49,13 +50,13 @@ contract BasePaymentGateway is Ownable2Step, Pausable {
         orders[id].status = Status.Shipped;
         emit OrderShipped(orderId);
     }
-    function refund(string calldata orderId) external onlyOwner {
+    function refund(string calldata orderId) external onlyOwner nonReentrant {
         bytes32 id = keccak256(bytes(orderId));
         Order storage o = orders[id];
         if (o.status!= Status.Paid) revert InvalidStatus();
         o.status = Status.Refunded;
-        usdc.safeTransfer(o.buyer, o.amount);
         emit OrderRefunded(orderId, o.amount);
+        usdc.safeTransfer(o.buyer, o.amount);
     }
     function pause() external onlyOwner { _pause(); }
     function unpause() external onlyOwner { _unpause(); }
