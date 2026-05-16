@@ -18,6 +18,8 @@ import {
 import { parseUnits } from 'viem';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { useAccount } from 'wagmi';
+import { Product, PRODUCTS } from '@/lib/products';
 
 /* ─── ERC-20 Approve ABI ─────────────────────────────── */
 const USDC_ABI = [
@@ -33,105 +35,56 @@ const USDC_ABI = [
     },
 ] as const;
 
-/* ─── Product Catalog ─────────────────────────────────── */
-interface Product {
-    id: string;
-    name: string;
-    description: string;
-    price: string;
-    image: string;
-    badge?: 'new' | 'bestseller' | 'limited';
-    sizes: string[];
-    colors: string[];
-}
-
-const PRODUCTS: Product[] = [
-    {
-        id: 'ORD-1001',
-        name: 'Abstract Muse Tee',
-        description: 'Minimalist abstract art on premium cotton. A wearable piece of art for the creative soul.',
-        price: '25',
-        image: '/products/tshirt-white-abstract.png',
-        badge: 'bestseller',
-        sizes: ['XS', 'S', 'M', 'L', 'XL'],
-        colors: ['#FFFFFF', '#F5F5F5', '#FDE8E8'],
-    },
-    {
-        id: 'ORD-1002',
-        name: 'Noir & Gold Edition',
-        description: 'Elegant gold geometric patterns on deep black. For nights that demand attention.',
-        price: '35',
-        image: '/products/tshirt-black-gold.png',
-        badge: 'limited',
-        sizes: ['XS', 'S', 'M', 'L'],
-        colors: ['#1A1A1A', '#2D2D2D'],
-    },
-    {
-        id: 'ORD-1003',
-        name: 'Sage Oversized Tee',
-        description: 'Relaxed oversized fit in calming sage green. Comfort meets effortless style.',
-        price: '22',
-        image: '/products/tshirt-sage-green.png',
-        badge: 'new',
-        sizes: ['S', 'M', 'L', 'XL'],
-        colors: ['#9CAF88', '#B4C7A5', '#E8F0E3'],
-    },
-    {
-        id: 'ORD-1004',
-        name: 'Rose Garden Tee',
-        description: 'Dusty rose with delicate floral embroidery. Romantic details meet modern silhouette.',
-        price: '28',
-        image: '/products/tshirt-dusty-rose.png',
-        sizes: ['XS', 'S', 'M', 'L', 'XL'],
-        colors: ['#D4A0A0', '#E8C4C4', '#F5E1E1'],
-    },
-    {
-        id: 'ORD-1005',
-        name: 'Lavender Crop',
-        description: 'Trendy cropped silhouette in soft lavender. Perfect for high-waist pairings.',
-        price: '20',
-        image: '/products/tshirt-lavender.png',
-        badge: 'new',
-        sizes: ['XS', 'S', 'M', 'L'],
-        colors: ['#C4B5E0', '#D8CCF0', '#E8E0F5'],
-    },
-    {
-        id: 'ORD-1006',
-        name: 'Maritime Stripe Tee',
-        description: 'Classic navy with crisp white sleeve stripes. Timeless nautical elegance reimagined.',
-        price: '1',
-        image: '/products/tshirt-navy-stripe.png',
-        badge: 'bestseller',
-        sizes: ['XS', 'S', 'M', 'L', 'XL'],
-        colors: ['#1E3A5F', '#2C4F7C', '#FFFFFF'],
-    },
-];
 
 /* ─── Product Card Component ──────────────────────────── */
 function ProductCard({ product, index }: { product: Product; index: number }) {
+    const { address } = useAccount();
     const [selectedSize, setSelectedSize] = useState(product.sizes[1] || product.sizes[0]);
-    const [orderId, setOrderId] = useState(() => `${product.id}-${selectedSize}-${Date.now()}`);
+    const [orderInfo, setOrderInfo] = useState<{ orderId: string, amount: string } | null>(null);
+    const [isCreating, setIsCreating] = useState(false);
 
     const priceInDecimals = parseUnits(product.price, 6);
 
     useEffect(() => {
-        setOrderId(`${product.id}-${selectedSize}-${Date.now()}`);
+        setOrderInfo(null);
     }, [selectedSize, product.id]);
 
-    const contracts = [
+    const handleCreateOrder = async () => {
+        if (!address) {
+            alert('Please connect your wallet first');
+            return;
+        }
+        setIsCreating(true);
+        try {
+            const res = await fetch('/api/create-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productId: product.id, size: selectedSize, buyer: address, priceInDecimals: priceInDecimals.toString() })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            setOrderInfo({ orderId: data.orderId, amount: data.amount });
+        } catch (e: any) {
+            alert('Failed to create order: ' + e.message);
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
+    const contracts = orderInfo ? [
         {
             address: USDC_ADDRESS,
             abi: USDC_ABI,
             functionName: 'approve' as const,
-            args: [GATEWAY_ADDRESS, priceInDecimals] as const,
+            args: [GATEWAY_ADDRESS, BigInt(orderInfo.amount)] as const,
         },
         {
             address: GATEWAY_ADDRESS,
             abi: GATEWAY_ABI,
             functionName: 'payForOrder' as const,
-            args: [priceInDecimals, orderId] as const,
+            args: [BigInt(orderInfo.amount), orderInfo.orderId] as const,
         },
-    ];
+    ] : [];
 
     return (
         <div className={`product-card animate-fade-in-up stagger-${index + 1}`}>
@@ -200,24 +153,34 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
                     </div>
                 </div>
 
-                <Transaction
-                    contracts={contracts}
-                    className="w-full"
-                    chainId={ACTIVE_CHAIN.id}
-                    onSuccess={(response) => {
-                        console.log("¡Pago exitoso! Hash:", response.transactionReceipts[0].transactionHash);
-                        setOrderId(`${product.id}-${selectedSize}-${Date.now()}`);
-                    }}
-                >
-                    <TransactionButton
-                        className="w-full bg-gray-900 text-white hover:bg-gray-800 rounded-xl py-3 text-sm font-medium transition-all duration-200 hover:shadow-lg"
-                        text={`Pay ${product.price} USDC`}
-                    />
-                    <TransactionStatus>
-                        <TransactionStatusLabel />
-                        <TransactionStatusAction />
-                    </TransactionStatus>
-                </Transaction>
+                {!orderInfo ? (
+                    <button
+                        onClick={handleCreateOrder}
+                        disabled={isCreating}
+                        className="w-full bg-gray-900 text-white hover:bg-gray-800 rounded-xl py-3 text-sm font-medium transition-all duration-200 hover:shadow-lg disabled:opacity-50"
+                    >
+                        {isCreating ? 'Preparing Order...' : `Buy for $${product.price} USDC`}
+                    </button>
+                ) : (
+                    <Transaction
+                        contracts={contracts}
+                        className="w-full"
+                        chainId={ACTIVE_CHAIN.id}
+                        onSuccess={(response) => {
+                            console.log("¡Pago exitoso! Hash:", response.transactionReceipts[0].transactionHash);
+                            setOrderInfo(null);
+                        }}
+                    >
+                        <TransactionButton
+                            className="w-full bg-blue-600 text-white hover:bg-blue-700 rounded-xl py-3 text-sm font-medium transition-all duration-200 hover:shadow-lg"
+                            text={`Confirm Payment`}
+                        />
+                        <TransactionStatus>
+                            <TransactionStatusLabel />
+                            <TransactionStatusAction />
+                        </TransactionStatus>
+                    </Transaction>
+                )}
             </div>
         </div>
     );
