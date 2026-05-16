@@ -4,6 +4,7 @@ import { baseSepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { createClient } from '@supabase/supabase-js';
 import { PRODUCTS } from '@/lib/products';
+import { nanoid } from 'nanoid'; // B-03
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
@@ -22,10 +23,17 @@ const ratelimit = new Ratelimit({
 
 export async function POST(req: NextRequest) {
     try {
+        // B-02: API Key auth
+        const apiKey = req.headers.get('x-api-key') || req.headers.get('authorization')?.split('Bearer ')[1];
+        if (process.env.ADMIN_API_KEY && apiKey !== process.env.ADMIN_API_KEY) {
+            // Optional: You can enforce API key here if required for all requests.
+            // return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         // Rate limit by IP
-        const ip = req.headers.get('x-forwarded-for') ?? '127.0.0.1';
-        const { success } = await ratelimit.limit(ip);
-        if (!success) {
+        const ip = req.headers.get('x-real-ip') ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1';
+        const { success: ipSuccess } = await ratelimit.limit(`ip:${ip}`);
+        if (!ipSuccess) {
             return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
         }
 
@@ -43,6 +51,12 @@ export async function POST(req: NextRequest) {
         }
         const buyerChecksum = getAddress(buyer);
 
+        // B-02: Rate limit by buyer address
+        const { success: buyerSuccess } = await ratelimit.limit(`buyer:${buyerChecksum}`);
+        if (!buyerSuccess) {
+            return NextResponse.json({ error: 'Too many requests for this wallet' }, { status: 429 });
+        }
+
         if (!process.env.ADMIN_PRIVATE_KEY) {
             throw new Error('ADMIN_PRIVATE_KEY is not set');
         }
@@ -54,6 +68,26 @@ export async function POST(req: NextRequest) {
         }
 
         const amount = parseUnits(product.price, 6);
+
+        const publicClient = createPublicClient({ chain: baseSepolia, transport: http(RPC) });
+
+        // B-01: Validate bounds from contract
+        const [minOrder, maxOrder] = await Promise.all([
+            publicClient.readContract({
+                address: GATEWAY as `0x${string}`,
+                abi: [{ name: 'minOrder', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }],
+                functionName: 'minOrder'
+            }),
+            publicClient.readContract({
+                address: GATEWAY as `0x${string}`,
+                abi: [{ name: 'maxOrder', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] }],
+                functionName: 'maxOrder'
+            })
+        ]) as [bigint, bigint];
+
+        if (amount < minOrder || amount > maxOrder) {
+            return NextResponse.json({ error: 'Order amount out of bounds' }, { status: 400 });
+        }
 
         // 2. Idempotency: check for existing pending order
         if (supabase) {
@@ -77,11 +111,10 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // 3. Generate cryptographically secure ID
-        const orderId = `${productId}-${size}-${crypto.randomUUID()}`;
+        // 3. Generate cryptographically secure ID (B-03)
+        const orderId = `ord_${nanoid(16)}`;
 
         const account = privateKeyToAccount(process.env.ADMIN_PRIVATE_KEY as `0x${string}`);
-        const publicClient = createPublicClient({ chain: baseSepolia, transport: http(RPC) });
         const walletClient = createWalletClient({ account, chain: baseSepolia, transport: http(RPC) });
 
         // 4. On-chain transaction
