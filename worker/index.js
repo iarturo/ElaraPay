@@ -5,12 +5,17 @@ const { createClient } = require('@supabase/supabase-js');
 const { GATEWAY_ADDRESS, SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
 const RPC_URL = process.env.BASE_SEPOLIA_RPC_URL || process.env.ALCHEMY_HTTP || 'https://sepolia.base.org';
 
+const WebSocket = require('ws');
+
 if (!GATEWAY_ADDRESS || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     console.error("❌ Faltan variables de entorno necesarias.");
     process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+    auth: { persistSession: false },
+    realtime: { transport: WebSocket }
+});
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 
 console.log('🎧 ELARA Worker Poller LIVE');

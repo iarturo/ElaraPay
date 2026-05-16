@@ -7,6 +7,7 @@ import { PRODUCTS } from '@/lib/products';
 import { nanoid } from 'nanoid'; // B-03
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
+import { redis } from '@/lib/redis'; // M-01
 
 const GATEWAY = process.env.NEXT_PUBLIC_GATEWAY_ADDRESS!;
 const RPC = process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org';
@@ -23,12 +24,7 @@ const ratelimit = new Ratelimit({
 
 export async function POST(req: NextRequest) {
     try {
-        // B-02: API Key auth
-        const apiKey = req.headers.get('x-api-key') || req.headers.get('authorization')?.split('Bearer ')[1];
-        if (process.env.ADMIN_API_KEY && apiKey !== process.env.ADMIN_API_KEY) {
-            // Optional: You can enforce API key here if required for all requests.
-            // return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+        // Removed API Key auth block (Option B) - endpoint relies on rate limit
 
         // Rate limit by IP
         const ip = req.headers.get('x-real-ip') ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1';
@@ -117,30 +113,42 @@ export async function POST(req: NextRequest) {
         const account = privateKeyToAccount(process.env.ADMIN_PRIVATE_KEY as `0x${string}`);
         const walletClient = createWalletClient({ account, chain: baseSepolia, transport: http(RPC) });
 
-        // 4. On-chain transaction
-        const hash = await walletClient.writeContract({
-            address: GATEWAY as `0x${string}`,
-            abi: [{
-                name: 'createOrder',
-                type: 'function',
-                stateMutability: 'nonpayable',
-                inputs: [
-                    { name: 'orderId', type: 'string' },
-                    { name: 'amount', type: 'uint256' },
-                    { name: 'buyer', type: 'address' }
-                ],
-                outputs: []
-            }],
-            functionName: 'createOrder',
-            args: [orderId, amount, buyerChecksum as `0x${string}`]
-        });
+        // M-01: Lock distribuido para evitar Nonce Racing
+        const lockKey = 'elara:tx-lock';
+        const acquired = await redis.set(lockKey, '1', { nx: true, ex: 30 });
+        if (!acquired) {
+            return NextResponse.json({ error: 'Server busy, please retry' }, { status: 503 });
+        }
 
-        // 5. Wait for 1 confirmation with timeout
-        await publicClient.waitForTransactionReceipt({
-            hash,
-            confirmations: 1,
-            timeout: 60_000
-        });
+        let hash;
+        try {
+            // 4. On-chain transaction
+            hash = await walletClient.writeContract({
+                address: GATEWAY as `0x${string}`,
+                abi: [{
+                    name: 'createOrder',
+                    type: 'function',
+                    stateMutability: 'nonpayable',
+                    inputs: [
+                        { name: 'orderId', type: 'string' },
+                        { name: 'amount', type: 'uint256' },
+                        { name: 'buyer', type: 'address' }
+                    ],
+                    outputs: []
+                }],
+                functionName: 'createOrder',
+                args: [orderId, amount, buyerChecksum as `0x${string}`]
+            });
+
+            // 5. Wait for 1 confirmation with timeout
+            await publicClient.waitForTransactionReceipt({
+                hash,
+                confirmations: 1,
+                timeout: 60_000
+            });
+        } finally {
+            await redis.del(lockKey);
+        }
 
         // 6. Persist order for idempotency
         if (supabase) {
