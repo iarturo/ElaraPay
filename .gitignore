@@ -7,6 +7,8 @@ worker/.env
 contracts/.env
 web/.env.local
 
+!.env.example
+
 # ─── Node / Next ──────────────────────────────────────
 node_modules/
 .next/
