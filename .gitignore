@@ -9,6 +9,9 @@ web/.env.local
 
 !.env.example
 
+
+new_owner.json
+
 # ─── Node / Next ──────────────────────────────────────
 node_modules/
 .next/
@@ -25,3 +28,4 @@ Thumbs.db
 # Python venv
 venv/
 __pycache__/
+
