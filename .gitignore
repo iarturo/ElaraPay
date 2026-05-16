@@ -29,3 +29,7 @@ Thumbs.db
 venv/
 __pycache__/
 
+
+# Server env con claves privadas
+web/.env.server.local
+**/.env.server.local
