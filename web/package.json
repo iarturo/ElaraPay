@@ -13,6 +13,8 @@
         "@coinbase/onchainkit": "^0.38.19",
         "@supabase/supabase-js": "^2.105.4",
         "@tanstack/react-query": "^5.100.10",
+        "@upstash/ratelimit": "^2.0.8",
+        "@upstash/redis": "^1.38.0",
         "dotenv": "^17.4.2",
         "next": "14.2.5",
         "pino": "^10.3.1",

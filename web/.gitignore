@@ -10,6 +10,7 @@ out/
 .env.local
 .env.production
 .env*.local
+.env.server.local
 
 # ─── OS ───────────────────────────────────────────────
 .DS_Store
