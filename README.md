@@ -402,6 +402,7 @@ To switch to **mainnet**, update the USDC address in your `.env` and change the 
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+2026
 
 ---
 
