@@ -8,8 +8,16 @@ import ws from 'ws'
 // Load env
 dotenv.config({ path: '.env.local' })
 
-    // Fix for Node 20 WebSocket
-    ; (global as any).WebSocket = ws
+// Fix for Node 20 WebSocket
+declare global {
+  namespace NodeJS {
+    interface Global {
+      WebSocket: typeof ws
+    }
+  }
+}
+
+global.WebSocket = ws
 
 // --- Config ---
 const ALCHEMY_URL = process.env.ALCHEMY_RPC_URL

@@ -64,8 +64,14 @@ function ProductCard({ product, index }: { product: Product; index: number }) {
             const data = await res.json();
             if (data.error) throw new Error(data.error);
             setOrderInfo({ orderId: data.orderId, amount: data.amount });
-        } catch (e: any) {
-            alert('Failed to create order: ' + e.message);
+        } catch (e: unknown) {
+            let errorMessage: string;
+            if (e instanceof Error) {
+                errorMessage = e.message;
+            } else {
+                errorMessage = String(e);
+            }
+            alert('Failed to create order: ' + errorMessage);
         } finally {
             setIsCreating(false);
         }
