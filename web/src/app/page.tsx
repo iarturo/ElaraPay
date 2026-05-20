@@ -226,6 +226,7 @@ export default function Home() {
                         </div>
 
                         <div className="flex items-center gap-3">
+                            <button onClick={() => { document.documentElement.classList.toggle('dark'); localStorage.setItem('darkMode', document.documentElement.classList.contains('dark') ? 'true' : 'false'); }} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">☀️</button>
                             <div className="hidden sm:flex items-center gap-1.5 text-xs text-gray-400 mr-2">
                                 <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                                 Base Sepolia
