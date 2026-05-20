@@ -9,7 +9,7 @@ import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import { redis } from '@/lib/redis'; // M-01
 
-const GATEWAY = process.env.NEXT_PUBLIC_GATEWAY_ADDRESS!;
+const GATEWAY = process.env.NEXT_PUBLIC_GATEWAY_ADDRESS || '';
 const RPC = process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org';
 
 const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY
