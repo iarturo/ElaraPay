@@ -29,7 +29,7 @@ This project is a working proof of concept: a premium e-commerce storefront (**E
 
 ## Live Demo
 
-> 🌐 **Live App:** [https://elara-pay.vercel.app](https://elara-pay.vercel.app)  
+> > 🌐 **Live App:** [https://elarapay.xyz](https://elarapay.xyz)
 > **Network:** Base Sepolia Testnet  
 > **Contract:** [`0x43EE62E72CDf8CD941AD8e7c20e8B384f6b3D684`](https://sepolia.basescan.org/address/0x43EE62E72CDf8CD941AD8e7c20e8B384f6b3D684)  
 > **USDC (Sepolia):** [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e)
@@ -369,7 +369,7 @@ node index.js
 
 | Platform | URL |
 |---|---|
-| **Frontend (Vercel)** | [https://elara-pay.vercel.app](https://elara-pay.vercel.app) |
+| **Frontend** | [https://elarapay.xyz](https://elarapay.xyz) |
 | **Contract (BaseScan)** | [View on BaseScan](https://sepolia.basescan.org/address/0x43EE62E72CDf8CD941AD8e7c20e8B384f6b3D684) |
 
 To switch to **mainnet**, update the USDC address in your `.env` and change the chain configuration in `Providers.tsx` from `baseSepolia` to `base`.
