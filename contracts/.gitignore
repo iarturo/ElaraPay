@@ -18,3 +18,5 @@ Thumbs.db
 venv/
 __pycache__/
 .env
+abi.json
+abi_utf8.json
