@@ -1,14 +1,15 @@
 import { Redis } from '@upstash/redis';
 
-function getEnv(key: string): string {
-  const val = process.env[key];
-  if (val === undefined) {
-    throw new Error(`Environment variable ${key} is required`);
-  }
-  return val;
-}
+let _redis: Redis | null = null;
 
-export const redis = new Redis({
-  url: getEnv('UPSTASH_REDIS_REST_URL'),
-  token: getEnv('UPSTASH_REDIS_REST_TOKEN'),
-});
+export function getRedis(): Redis {
+  if (!_redis) {
+    const url = process.env.UPSTASH_REDIS_REST_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+    if (!url || !token) {
+      throw new Error('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required');
+    }
+    _redis = new Redis({ url, token });
+  }
+  return _redis;
+}

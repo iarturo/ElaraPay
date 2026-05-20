@@ -6,8 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { PRODUCTS } from '@/lib/products';
 import { nanoid } from 'nanoid'; // B-03
 import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
-import { redis } from '@/lib/redis'; // M-01
+import { getRedis } from '@/lib/redis'; // M-01
 
 const GATEWAY = process.env.NEXT_PUBLIC_GATEWAY_ADDRESS || '';
 const RPC = process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org';
@@ -16,11 +15,17 @@ const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY
     ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
     : null;
 
-const ratelimit = new Ratelimit({
-    redis: Redis.fromEnv(),
-    limiter: Ratelimit.slidingWindow(5, '1 m'),
-    prefix: 'elara:create-order',
-});
+let _ratelimit: Ratelimit | null = null;
+function getRatelimit(): Ratelimit {
+    if (!_ratelimit) {
+        _ratelimit = new Ratelimit({
+            redis: getRedis(),
+            limiter: Ratelimit.slidingWindow(5, '1 m'),
+            prefix: 'elara:create-order',
+        });
+    }
+    return _ratelimit;
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -28,7 +33,8 @@ export async function POST(req: NextRequest) {
 
         // Rate limit by IP
         const ip = req.headers.get('x-real-ip') ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '127.0.0.1';
-        const { success: ipSuccess } = await ratelimit.limit(`ip:${ip}`);
+        const rl = getRatelimit();
+        const { success: ipSuccess } = await rl.limit(`ip:${ip}`);
         if (!ipSuccess) {
             return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
         }
@@ -48,7 +54,7 @@ export async function POST(req: NextRequest) {
         const buyerChecksum = getAddress(buyer);
 
         // B-02: Rate limit by buyer address
-        const { success: buyerSuccess } = await ratelimit.limit(`buyer:${buyerChecksum}`);
+        const { success: buyerSuccess } = await rl.limit(`buyer:${buyerChecksum}`);
         if (!buyerSuccess) {
             return NextResponse.json({ error: 'Too many requests for this wallet' }, { status: 429 });
         }
@@ -115,7 +121,7 @@ export async function POST(req: NextRequest) {
 
         // M-01: Lock distribuido para evitar Nonce Racing
         const lockKey = 'elara:tx-lock';
-        const acquired = await redis.set(lockKey, '1', { nx: true, ex: 30 });
+        const acquired = await getRedis().set(lockKey, '1', { nx: true, ex: 30 });
         if (!acquired) {
             return NextResponse.json({ error: 'Server busy, please retry' }, { status: 503 });
         }
@@ -146,7 +152,7 @@ export async function POST(req: NextRequest) {
                 timeout: 60_000
             });
         } finally {
-            await redis.del(lockKey);
+            await getRedis().del(lockKey);
         }
 
         // 6. Persist order for idempotency
