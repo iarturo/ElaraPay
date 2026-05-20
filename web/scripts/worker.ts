@@ -20,9 +20,17 @@ const ALCHEMY_URL = process.env.ALCHEMY_RPC_URL
 const ACTIVE_CHAIN = process.env.NEXT_PUBLIC_CHAIN === 'mainnet' ? base : baseSepolia
 const GATEWAY_ADDRESS = process.env.NEXT_PUBLIC_GATEWAY_ADDRESS as `0x${string}`
 
+function isString(value: unknown): value is string {
+    return typeof value === 'string';
+}
+
+if (!isString(process.env.SUPABASE_URL) || !isString(process.env.SUPABASE_SERVICE_KEY)) {
+    throw new Error('Environment variables SUPABASE_URL and SUPABASE_SERVICE_KEY must be set');
+}
+
 const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY
 )
 
 // --- Use WebSocket if URL starts with wss ---
