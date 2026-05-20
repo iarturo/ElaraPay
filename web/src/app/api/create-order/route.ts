@@ -139,7 +139,6 @@ export async function POST(req: NextRequest) {
                 functionName: 'createOrder',
                 args: [orderId, amount, buyerChecksum as `0x${string}`]
             });
-
             // 5. Wait for 1 confirmation with timeout
             await publicClient.waitForTransactionReceipt({
                 hash,
@@ -164,7 +163,7 @@ export async function POST(req: NextRequest) {
         }
 
         return NextResponse.json({ orderId, amount: amount.toString(), tx: hash });
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('Error creating order:', e);
         return NextResponse.json({ error: 'Internal error' }, { status: 500 });
     }
