@@ -29,8 +29,10 @@ This project is a working proof of concept: a premium e-commerce storefront (**E
 
 ## Live Demo
 
+> 🌐 **Live App:** [https://elara-pay.vercel.app](https://elara-pay.vercel.app)  
 > **Network:** Base Sepolia Testnet  
-> **Contract:** [`0xAB87C048805DCc643C4C6aa30E98F1B3E75C10c9`](https://sepolia.basescan.org/address/0xAB87C048805DCc643C4C6aa30E98F1B3E75C10c9)
+> **Contract:** [`0x12876a34a4467c22935b29642135f40ba5d2c7d3`](https://sepolia.basescan.org/address/0x12876a34a4467c22935b29642135f40ba5d2c7d3)  
+> **USDC (Sepolia):** [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e)
 
 ---
 
@@ -38,14 +40,20 @@ This project is a working proof of concept: a premium e-commerce storefront (**E
 
 | Feature | Details |
 |---|---|
-| **Non-Custodial** | Funds go directly from buyer → merchant via `transferFrom`. The contract never holds funds. |
+| **Escrow Model** | Funds are held in the contract until the admin marks the order as shipped, then released to the merchant. |
 | **USDC Native** | Built for Circle's USDC on Base. Stable, predictable, and denominated in dollars. |
+| **Backend-Created Orders** | Orders are created on-chain by the backend (admin) with a fixed price — the frontend never sets the price. |
 | **Replay Protection** | Each `orderId` can only be paid once. Prevents double-charge attacks at the contract level. |
-| **CEI Pattern** | Follows the Checks-Effects-Interactions pattern to mitigate reentrancy vulnerabilities. |
+| **ReentrancyGuard + CEI** | Uses OpenZeppelin's `ReentrancyGuard` and follows the Checks-Effects-Interactions pattern. |
+| **Order Limits (M-02)** | Configurable `minOrder` / `maxOrder` bounds enforced on-chain. |
+| **EIP-2612 Permit** | Supports gasless approvals via `payWithPermit` for a better UX. |
+| **Rate Limiting** | IP and wallet-based rate limiting via Upstash Redis to prevent abuse. |
+| **Distributed Locking (M-01)** | Redis-based distributed lock prevents nonce racing on concurrent order creation. |
 | **Gas Optimized** | Custom errors instead of `require` strings. Immutable state variables. Minimal storage footprint. |
 | **OnchainKit Integration** | Coinbase Smart Wallet support via `@coinbase/onchainkit` — one-click wallet connection. |
-| **Event-Driven Fulfillment** | Emits `PaymentReceived` events that a dedicated Node.js backend listens to and indexes into Supabase for order fulfillment. |
-| **Admin Controls** | Includes admin functions to mark orders as shipped, or to process full refunds on-chain. |
+| **Event-Driven Fulfillment** | Emits `PaymentReceived` events that a dedicated Node.js backend listens to and indexes into Supabase. |
+| **Admin Controls** | Mark orders as shipped (releases funds), process refunds, rescue stuck tokens, pause/unpause. |
+| **ETH Rejection (M-05)** | Contract rejects unexpected ETH transfers to prevent accidental loss. |
 
 ---
 
@@ -96,11 +104,13 @@ This project is a working proof of concept: a premium e-commerce storefront (**E
 
 1. Customer connects their **Coinbase Smart Wallet** via OnchainKit
 2. Customer selects a product, size, and color
-3. OnchainKit batches two calls into one user approval:
+3. Frontend calls the **backend API** (`/api/create-order`) which creates the order on-chain with a fixed price (backend is source of truth)
+4. OnchainKit batches two calls into one user approval:
    - `USDC.approve(gateway, amount)` — authorize the gateway to spend
    - `gateway.payForOrder(amount, orderId)` — execute the payment
-4. The contract validates the order, marks it as fulfilled, emits `PaymentReceived`, and transfers USDC directly to the merchant
-5. A **Node.js backend worker** listens for the event via Alchemy WebSockets, parses the `orderId` and `amount`, and stores the confirmed order directly into a **Supabase** database.
+5. The contract validates the order, marks it as **Paid**, emits `PaymentReceived`, and holds USDC in **escrow**
+6. Admin calls `markShipped()` to release funds to the merchant, or `refund()` to return USDC to the buyer
+7. A **Node.js backend worker** listens for the event via Alchemy WebSockets and indexes into **Supabase**
 
 ---
 
@@ -124,6 +134,15 @@ This project is a working proof of concept: a premium e-commerce storefront (**E
 | **viem** | TypeScript-first EVM interactions |
 | **TailwindCSS** | Utility-first styling |
 
+### Backend API (`/web/src/app/api`)
+
+| Technology | Purpose |
+|---|---|
+| **Next.js API Routes** | Server-side order creation and management |
+| **Upstash Redis** | Rate limiting and distributed locking (nonce racing prevention) |
+| **nanoid** | Cryptographically secure order ID generation |
+| **Supabase** | PostgreSQL database for order persistence and idempotency |
+
 ### Backend Worker (`/worker`)
 
 | Technology | Purpose |
@@ -140,12 +159,12 @@ This project is a working proof of concept: a premium e-commerce storefront (**E
 Base/
 ├── contracts/                    # Foundry project
 │   ├── src/
-│   │   └── BasePaymentGateway.sol    # Core payment router contract
+│   │   └── BasePaymentGateway.sol    # Core payment gateway contract (escrow model)
 │   ├── test/
 │   │   └── Gateway.t.sol             # Comprehensive Forge test suite
 │   ├── script/
 │   │   └── DeployGateway.s.sol       # Deployment script
-│   ├── foundry.toml                  # Forge configuration
+│   ├── foundry.toml                  # Forge config (Etherscan V2 verification)
 │   └── .env.example                  # Environment variable template
 │
 ├── web/                          # Next.js storefront
@@ -153,11 +172,16 @@ Base/
 │   │   ├── app/
 │   │   │   ├── page.tsx              # Main storefront (ELARA)
 │   │   │   ├── layout.tsx            # Root layout with Providers
-│   │   │   └── globals.css           # Design system + animations
+│   │   │   ├── globals.css           # Design system + animations
+│   │   │   └── api/
+│   │   │       └── create-order/
+│   │   │           └── route.ts      # Backend order creation API
 │   │   ├── components/
 │   │   │   └── Providers.tsx         # wagmi + OnchainKit + React Query
 │   │   └── lib/
-│   │       └── contracts.ts          # ABI + contract addresses
+│   │       ├── contracts.ts          # ABI + contract addresses
+│   │       ├── products.ts           # Product catalog (source of truth)
+│   │       └── redis.ts              # Upstash Redis client
 │   └── package.json
 │
 ├── worker/                       # Node.js Event Indexer
@@ -174,32 +198,44 @@ Base/
 
 ### `BasePaymentGateway.sol`
 
-A single, focused contract with one job: **route USDC from buyer to merchant, reliably.**
+A single, focused contract that manages the full order lifecycle: **Create → Pay → Ship/Refund**, with USDC held in escrow.
 
-```solidity
-function payForOrder(uint256 amount, string calldata orderId) external {
-    // ── Checks ──
-    if (amount == 0) revert ZeroAmount();
-    if (bytes(orderId).length == 0) revert EmptyOrderId();
+**Core Functions:**
 
-    bytes32 id = keccak256(bytes(orderId));
-    if (orders[id].status != Status.None) revert OrderAlreadyPaid();
+| Function | Access | Description |
+|---|---|---|
+| `createOrder()` | Owner | Creates an order with fixed price, bound to a specific buyer |
+| `payForOrder()` | Buyer | Pays for an existing order (requires prior USDC approval) |
+| `payWithPermit()` | Buyer | Pays using EIP-2612 permit (gasless approval) |
+| `markShipped()` | Owner | Releases escrowed USDC to the merchant |
+| `refund()` | Owner | Returns escrowed USDC to the buyer |
+| `setLimits()` | Owner | Sets min/max order amount bounds |
+| `rescueERC20()` | Owner | Rescues stuck tokens from the contract |
+| `pause() / unpause()` | Owner | Emergency pause mechanism |
+| `getOrder()` | Public | View helper to query order details |
 
-    // ── Effects (state change BEFORE external call — CEI) ──
-    orders[id] = Order(msg.sender, amount, Status.Paid, uint64(block.timestamp));
+**Security Audit Fixes Applied:**
 
-    // ── Interactions (external call LAST) ──
-    usdc.safeTransferFrom(msg.sender, owner(), amount);
+| ID | Severity | Fix |
+|---|---|---|
+| **M-01** | Medium | Distributed lock (Redis) prevents nonce racing in backend |
+| **M-02** | Medium | On-chain `minOrder` / `maxOrder` bounds |
+| **M-03** | Medium | `rescueERC20()` to recover stuck tokens |
+| **M-04** | Medium | Explicit allowance check after `permit` try/catch |
+| **M-05** | Medium | `receive()` reverts to reject unexpected ETH |
+| **B-01** | Backend | Validate order amount against contract bounds before `createOrder` |
+| **B-02** | Backend | Per-wallet rate limiting via Upstash Redis |
+| **B-03** | Backend | Cryptographically secure order IDs via `nanoid` |
+| **I-01** | Info | `getOrder()` view helper for easier integrations |
+| **I-03** | Info | `Rescued` event emitted on token recovery |
 
-    emit PaymentReceived(msg.sender, orderId, amount);
-}
-```
-
-**Security highlights:**
-- **CEI pattern** — State changes before external calls to prevent reentrancy
-- **Replay protection** — `orders` mapping prevents double payments
+**Additional Security:**
+- **OpenZeppelin `Ownable2Step`** — Two-step ownership transfer prevents accidental loss
+- **OpenZeppelin `ReentrancyGuard`** — Protects all state-changing external functions
+- **OpenZeppelin `Pausable`** — Emergency circuit breaker
+- **CEI Pattern** — State changes before external calls
 - **Custom errors** — Gas-efficient error handling (no string storage)
-- **Immutable state** — `owner` and `usdc` are set once at deploy time
+- **Immutable USDC** — `usdc` address set once at deploy time
 
 ---
 
@@ -235,8 +271,8 @@ forge test -vvv
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/iarturo/base-payment-gateway.git
-cd base-payment-gateway
+git clone https://github.com/iarturo/ElaraPay.git
+cd ElaraPay
 ```
 
 ### 2. Smart Contract Setup
@@ -257,12 +293,15 @@ forge build
 forge test -vvv
 ```
 
-**Deploy to Base Sepolia:**
+**Deploy to Base Sepolia (with verification):**
 ```bash
-forge script script/DeployGateway.s.sol:DeployGateway \
+source .env && forge script script/DeployGateway.s.sol:DeployGateway \
   --rpc-url $BASE_SEPOLIA_RPC_URL \
   --broadcast \
-  --verify
+  --verify \
+  --verifier etherscan \
+  --verifier-url "https://api.etherscan.io/v2/api?chainid=84532" \
+  --etherscan-api-key $BASESCAN_API_KEY
 ```
 
 ### 3. Frontend Setup
@@ -275,9 +314,19 @@ npm install
 Create a `.env.local` file:
 ```env
 NEXT_PUBLIC_ONCHAINKIT_API_KEY=your_coinbase_api_key
-NEXT_PUBLIC_GATEWAY_ADDRESS=0xYourDeployedGatewayAddress
+NEXT_PUBLIC_GATEWAY_ADDRESS=0x12876a34a4467c22935b29642135f40ba5d2c7d3
 NEXT_PUBLIC_USDC_ADDRESS=0x036CbD53842c5426634e7929541eC2318f3dCF7e
+NEXT_PUBLIC_CHAIN=sepolia
 NEXT_PUBLIC_ALCHEMY_ID=your_alchemy_api_key
+```
+
+Create a `.env.server.local` file (server-side secrets):
+```env
+ADMIN_PRIVATE_KEY=0xYourAdminPrivateKey
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your_supabase_service_key
+UPSTASH_REDIS_REST_URL=your_upstash_redis_url
+UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_token
 ```
 
 **Run the development server:**
@@ -299,7 +348,7 @@ npm install
 Create a `.env` file in the `worker` directory:
 ```env
 ALCHEMY_WSS=wss://base-sepolia.g.alchemy.com/v2/your_alchemy_api_key
-GATEWAY_ADDRESS=0xYourDeployedGatewayAddress
+GATEWAY_ADDRESS=0x12876a34a4467c22935b29642135f40ba5d2c7d3
 SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_SERVICE_KEY=your_supabase_service_role_key
 ```
@@ -313,10 +362,15 @@ node index.js
 
 ## Deployment
 
-| Network | USDC Address | Chain ID |
-|---|---|---|
-| **Base Sepolia** | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | 84532 |
-| **Base Mainnet** | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | 8453 |
+| Network | Contract | USDC Address | Chain ID |
+|---|---|---|---|
+| **Base Sepolia** | [`0x12876a34a...c7D3`](https://sepolia.basescan.org/address/0x12876a34a4467c22935b29642135f40ba5d2c7d3) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | 84532 |
+| **Base Mainnet** | _Not yet deployed_ | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | 8453 |
+
+| Platform | URL |
+|---|---|
+| **Frontend (Vercel)** | [https://elara-pay.vercel.app](https://elara-pay.vercel.app) |
+| **Contract (BaseScan)** | [View on BaseScan](https://sepolia.basescan.org/address/0x12876a34a4467c22935b29642135f40ba5d2c7d3) |
 
 To switch to **mainnet**, update the USDC address in your `.env` and change the chain configuration in `Providers.tsx` from `baseSepolia` to `base`.
 
