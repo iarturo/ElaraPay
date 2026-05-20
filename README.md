@@ -31,7 +31,7 @@ This project is a working proof of concept: a premium e-commerce storefront (**E
 
 > 🌐 **Live App:** [https://elara-pay.vercel.app](https://elara-pay.vercel.app)  
 > **Network:** Base Sepolia Testnet  
-> **Contract:** [`0x12876a34a4467c22935b29642135f40ba5d2c7d3`](https://sepolia.basescan.org/address/0x12876a34a4467c22935b29642135f40ba5d2c7d3)  
+> **Contract:** [`0x43EE62E72CDf8CD941AD8e7c20e8B384f6b3D684`](https://sepolia.basescan.org/address/0x43EE62E72CDf8CD941AD8e7c20e8B384f6b3D684)  
 > **USDC (Sepolia):** [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e)
 
 ---
@@ -314,7 +314,7 @@ npm install
 Create a `.env.local` file:
 ```env
 NEXT_PUBLIC_ONCHAINKIT_API_KEY=your_coinbase_api_key
-NEXT_PUBLIC_GATEWAY_ADDRESS=0x12876a34a4467c22935b29642135f40ba5d2c7d3
+NEXT_PUBLIC_GATEWAY_ADDRESS=0x43EE62E72CDf8CD941AD8e7c20e8B384f6b3D684
 NEXT_PUBLIC_USDC_ADDRESS=0x036CbD53842c5426634e7929541eC2318f3dCF7e
 NEXT_PUBLIC_CHAIN=sepolia
 NEXT_PUBLIC_ALCHEMY_ID=your_alchemy_api_key
@@ -348,7 +348,7 @@ npm install
 Create a `.env` file in the `worker` directory:
 ```env
 ALCHEMY_WSS=wss://base-sepolia.g.alchemy.com/v2/your_alchemy_api_key
-GATEWAY_ADDRESS=0x12876a34a4467c22935b29642135f40ba5d2c7d3
+GATEWAY_ADDRESS=0x43EE62E72CDf8CD941AD8e7c20e8B384f6b3D684
 SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_SERVICE_KEY=your_supabase_service_role_key
 ```
@@ -364,13 +364,13 @@ node index.js
 
 | Network | Contract | USDC Address | Chain ID |
 |---|---|---|---|
-| **Base Sepolia** | [`0x12876a34a...c7D3`](https://sepolia.basescan.org/address/0x12876a34a4467c22935b29642135f40ba5d2c7d3) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | 84532 |
+| **Base Sepolia** | [`0x43EE62E...D684`](https://sepolia.basescan.org/address/0x43EE62E72CDf8CD941AD8e7c20e8B384f6b3D684) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | 84532 |
 | **Base Mainnet** | _Not yet deployed_ | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | 8453 |
 
 | Platform | URL |
 |---|---|
 | **Frontend (Vercel)** | [https://elara-pay.vercel.app](https://elara-pay.vercel.app) |
-| **Contract (BaseScan)** | [View on BaseScan](https://sepolia.basescan.org/address/0x12876a34a4467c22935b29642135f40ba5d2c7d3) |
+| **Contract (BaseScan)** | [View on BaseScan](https://sepolia.basescan.org/address/0x43EE62E72CDf8CD941AD8e7c20e8B384f6b3D684) |
 
 To switch to **mainnet**, update the USDC address in your `.env` and change the chain configuration in `Providers.tsx` from `baseSepolia` to `base`.
 
