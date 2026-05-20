@@ -10,11 +10,7 @@ dotenv.config({ path: '.env.local' })
 
 // Fix for Node 20 WebSocket
 declare global {
-  namespace NodeJS {
-    interface Global {
-      WebSocket: typeof ws
-    }
-  }
+  var WebSocket: typeof ws
 }
 
 global.WebSocket = ws
