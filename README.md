@@ -376,6 +376,39 @@ To switch to **mainnet**, update the USDC address in your `.env` and change the 
 
 ---
 
+## Webhook Notifications
+
+ElaraPay supports sending real-time webhook notifications to the merchant's configured server immediately when a payment is received on-chain and indexed.
+
+### Configuration
+
+To enable webhooks, add the `WEBHOOK_URL` variable to your `.env` (for standalone worker) or `.env.local` (for Next.js worker):
+
+```env
+WEBHOOK_URL=https://your-merchant-server.com/api/payments/webhook
+```
+
+### Webhook Delivery & Retry Logic
+
+- **Asynchronous Delivery**: The webhook is fired asynchronously immediately after database indexing to avoid blocking blockchain event listening.
+- **Automatic Retries**: Failed deliveries (non-2xx response or network issues) are retried **up to 3 times** with **exponential backoff** (2 seconds, then 4 seconds delays).
+
+### Payload Schema
+
+Webhooks are delivered via `POST` with a JSON payload:
+
+```json
+{
+  "orderId": "ord_1234567890abcdef",
+  "amount": 120.00,
+  "buyer": "0x0000000000000000000000000000000000000000",
+  "txHash": "0x...",
+  "timestamp": "2026-05-21T12:00:00.000Z"
+}
+```
+
+---
+
 ## Roadmap
 
 - [x] **Refund mechanism** — Admin-initiated refunds with on-chain audit trail

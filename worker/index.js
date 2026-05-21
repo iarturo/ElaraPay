@@ -2,7 +2,7 @@ require('dotenv').config();
 const { ethers } = require('ethers');
 const { createClient } = require('@supabase/supabase-js');
 
-const { GATEWAY_ADDRESS, SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
+const { GATEWAY_ADDRESS, SUPABASE_URL, SUPABASE_SERVICE_KEY, WEBHOOK_URL } = process.env;
 const RPC_URL = process.env.BASE_SEPOLIA_RPC_URL || process.env.ALCHEMY_HTTP || 'https://sepolia.base.org';
 
 const WebSocket = require('ws');
@@ -46,6 +46,34 @@ async function updateWorkerState(blockNumber) {
     await supabase.from('worker_state').upsert({ id: 1, last_block: blockNumber });
 }
 
+async function sendWebhook(url, payload, attempt = 1) {
+    if (!url) return;
+    try {
+        console.log(`📡 Sending webhook to ${url} (Attempt ${attempt}/3)...`);
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        console.log('✅ Webhook delivered successfully!');
+    } catch (error) {
+        console.error(`❌ Webhook delivery failed (Attempt ${attempt}/3):`, error.message);
+        if (attempt < 3) {
+            const delay = Math.pow(2, attempt) * 1000;
+            console.log(`Retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return sendWebhook(url, payload, attempt + 1);
+        } else {
+            console.error('❌ Max webhook retry attempts reached. Delivery failed.');
+        }
+    }
+}
+
 async function processEvent(event) {
     const { args: [buyer, orderId, amount], transactionHash, blockNumber, blockHash } = event;
     const amountUSDC = ethers.formatUnits(amount, 6);
@@ -78,6 +106,19 @@ async function processEvent(event) {
         status: 'confirmed',
         order_id: orderId
     });
+
+    if (WEBHOOK_URL) {
+        const payload = {
+            orderId: orderId,
+            amount: parseFloat(amountUSDC),
+            buyer: buyer.toLowerCase(),
+            txHash: transactionHash,
+            timestamp: new Date().toISOString()
+        };
+        sendWebhook(WEBHOOK_URL, payload).catch(err => {
+            console.error('Error in sendWebhook call:', err);
+        });
+    }
 }
 
 async function runPoller() {
