@@ -206,6 +206,14 @@ export default function Home() {
 
     return (
         <div className="min-h-screen bg-[#FAFAFA]">
+            <div className="bg-yellow-400 text-black text-center py-2 text-sm font-medium">
+                🚧 This is a demo on Base Sepolia testnet. 
+                No real money involved. 
+                <a href="https://www.alchemy.com/faucets/base-sepolia" 
+                   className="underline ml-1" target="_blank">
+                    Get test USDC here
+                </a>
+            </div>
             {/* Navigation */}
             <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100">
                 <div className="max-w-7xl mx-auto px-6 lg:px-8">
