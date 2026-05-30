@@ -58,22 +58,22 @@ const sendMerchantWebhookAttempt = async (webhookUrl, payload, fetchImpl) => {
     }
 };
 
-const postMerchantWebhook = async (payload, options = {}) => {
-    const webhookUrl = options.webhookUrl ?? MERCHANT_WEBHOOK_URL;
-    if (!webhookUrl) {
-        return { delivered: false, skipped: true, attempts: 0 };
+const tryMerchantWebhookAttempt = async (webhookUrl, payload, fetchImpl) => {
+    try {
+        await sendMerchantWebhookAttempt(webhookUrl, payload, fetchImpl);
+        return null;
+    } catch (error) {
+        return error;
     }
+};
 
-    const fetchImpl = options.fetchImpl ?? fetch;
-    const sleepImpl = options.sleep ?? sleep;
+const retryMerchantWebhook = async (webhookUrl, payload, fetchImpl, sleepImpl) => {
     let lastError = null;
 
     for (let attempt = 1; attempt <= WEBHOOK_ATTEMPTS; attempt += 1) {
-        try {
-            await sendMerchantWebhookAttempt(webhookUrl, payload, fetchImpl);
+        lastError = await tryMerchantWebhookAttempt(webhookUrl, payload, fetchImpl);
+        if (!lastError) {
             return { delivered: true, skipped: false, attempts: attempt };
-        } catch (error) {
-            lastError = error;
         }
 
         if (attempt < WEBHOOK_ATTEMPTS) {
@@ -88,6 +88,20 @@ const postMerchantWebhook = async (payload, options = {}) => {
         attempts: WEBHOOK_ATTEMPTS,
         error: lastError?.message || 'unknown error',
     };
+};
+
+const postMerchantWebhook = async (payload, options = {}) => {
+    const webhookUrl = options.webhookUrl ?? MERCHANT_WEBHOOK_URL;
+    if (!webhookUrl) {
+        return { delivered: false, skipped: true, attempts: 0 };
+    }
+
+    return retryMerchantWebhook(
+        webhookUrl,
+        payload,
+        options.fetchImpl ?? fetch,
+        options.sleep ?? sleep
+    );
 };
 
 const processEvent = async (event) => {
@@ -167,8 +181,6 @@ const runPoller = async () => {
 };
 
 if (require.main === module) {
-    console.log('🎧 ELARA Worker Poller LIVE');
-    console.log('Gateway:', GATEWAY_ADDRESS);
     runPoller();
 }
 
