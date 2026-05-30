@@ -351,12 +351,27 @@ ALCHEMY_WSS=wss://base-sepolia.g.alchemy.com/v2/your_alchemy_api_key
 GATEWAY_ADDRESS=0x43EE62E72CDf8CD941AD8e7c20e8B384f6b3D684
 SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_SERVICE_KEY=your_supabase_service_role_key
+MERCHANT_WEBHOOK_URL=https://merchant.example/webhooks/elarapay
 ```
 
 Run the worker:
 ```bash
 node index.js
 ```
+
+When `MERCHANT_WEBHOOK_URL` is set, each indexed payment sends:
+
+```json
+{
+  "orderId": "ord_...",
+  "amount": 42,
+  "buyer": "0x...",
+  "txHash": "0x...",
+  "timestamp": "2026-05-30T00:00:00.000Z"
+}
+```
+
+Failed webhook deliveries retry 3 times with exponential backoff.
 
 ---
 

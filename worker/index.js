@@ -2,7 +2,7 @@ require('dotenv').config();
 const { ethers } = require('ethers');
 const { createClient } = require('@supabase/supabase-js');
 
-const { GATEWAY_ADDRESS, SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
+const { GATEWAY_ADDRESS, SUPABASE_URL, SUPABASE_SERVICE_KEY, MERCHANT_WEBHOOK_URL } = process.env;
 const RPC_URL = process.env.BASE_SEPOLIA_RPC_URL || process.env.ALCHEMY_HTTP || 'https://sepolia.base.org';
 
 const WebSocket = require('ws');
@@ -18,9 +18,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
 });
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 
-console.log('🎧 ELARA Worker Poller LIVE');
-console.log('Gateway:', GATEWAY_ADDRESS);
-
 const gateway = new ethers.Contract(
     GATEWAY_ADDRESS,
     ['event PaymentReceived(address indexed buyer, string orderId, uint256 amount)'],
@@ -30,6 +27,11 @@ const gateway = new ethers.Contract(
 const CONFIRMATIONS = 2;
 const POLL_INTERVAL_MS = 10_000;
 const MAX_BLOCK_RANGE = 500; // M-04: límite de batch
+const WEBHOOK_ATTEMPTS = 3;
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 async function getWorkerState() {
     const { data, error } = await supabase.from('worker_state').select('last_block').eq('id', 1).single();
@@ -44,6 +46,47 @@ async function getWorkerState() {
 
 async function updateWorkerState(blockNumber) {
     await supabase.from('worker_state').upsert({ id: 1, last_block: blockNumber });
+}
+
+async function postMerchantWebhook(payload, options = {}) {
+    const webhookUrl = options.webhookUrl ?? MERCHANT_WEBHOOK_URL;
+    if (!webhookUrl) {
+        return { delivered: false, skipped: true, attempts: 0 };
+    }
+
+    const fetchImpl = options.fetchImpl ?? fetch;
+    const sleepImpl = options.sleep ?? sleep;
+    let lastError;
+
+    for (let attempt = 1; attempt <= WEBHOOK_ATTEMPTS; attempt += 1) {
+        try {
+            const response = await fetchImpl(webhookUrl, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (response.ok) {
+                return { delivered: true, skipped: false, attempts: attempt };
+            }
+
+            lastError = new Error(`Merchant webhook responded ${response.status}`);
+        } catch (error) {
+            lastError = error;
+        }
+
+        if (attempt < WEBHOOK_ATTEMPTS) {
+            await sleepImpl(1000 * (2 ** (attempt - 1)));
+        }
+    }
+
+    console.warn(`⚠️ Merchant webhook failed after ${WEBHOOK_ATTEMPTS} attempts: ${lastError?.message || 'unknown error'}`);
+    return {
+        delivered: false,
+        skipped: false,
+        attempts: WEBHOOK_ATTEMPTS,
+        error: lastError?.message || 'unknown error',
+    };
 }
 
 async function processEvent(event) {
@@ -66,7 +109,7 @@ async function processEvent(event) {
 
     console.log(`\n💰 Pago: ${amountUSDC} USDC | Orden: ${orderId} | ${buyer.slice(0, 8)}...`);
 
-    await supabase.from('payments').insert({
+    const payment = {
         payer: buyer.toLowerCase(),
         amount: parseFloat(amountUSDC),
         token: 'USDC',
@@ -77,6 +120,19 @@ async function processEvent(event) {
         chain: 'base-sepolia',
         status: 'confirmed',
         order_id: orderId
+    };
+
+    const { error } = await supabase.from('payments').insert(payment);
+    if (error) {
+        throw new Error(`Failed to index payment ${transactionHash}: ${error.message}`);
+    }
+
+    await postMerchantWebhook({
+        orderId,
+        amount: payment.amount,
+        buyer: payment.payer,
+        txHash: transactionHash,
+        timestamp: new Date().toISOString(),
     });
 }
 
@@ -105,8 +161,17 @@ async function runPoller() {
         } catch (error) {
             console.error('❌ Error en poller:', error.message);
         }
-        await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+        await sleep(POLL_INTERVAL_MS);
     }
 }
 
-runPoller();
+if (require.main === module) {
+    console.log('🎧 ELARA Worker Poller LIVE');
+    console.log('Gateway:', GATEWAY_ADDRESS);
+    runPoller();
+}
+
+module.exports = {
+    postMerchantWebhook,
+    processEvent,
+};
