@@ -29,11 +29,9 @@ const POLL_INTERVAL_MS = 10_000;
 const MAX_BLOCK_RANGE = 500; // M-04: límite de batch
 const WEBHOOK_ATTEMPTS = 3;
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function getWorkerState() {
+const getWorkerState = async () => {
     const { data, error } = await supabase.from('worker_state').select('last_block').eq('id', 1).single();
     if (error || !data) {
         console.log('⚠️ No state, iniciando desde bloque actual...');
@@ -42,13 +40,25 @@ async function getWorkerState() {
         return current;
     }
     return data.last_block;
-}
+};
 
-async function updateWorkerState(blockNumber) {
+const updateWorkerState = async (blockNumber) => {
     await supabase.from('worker_state').upsert({ id: 1, last_block: blockNumber });
-}
+};
 
-async function postMerchantWebhook(payload, options = {}) {
+const sendMerchantWebhookAttempt = async (webhookUrl, payload, fetchImpl) => {
+    const response = await fetchImpl(webhookUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Merchant webhook responded ${response.status}`);
+    }
+};
+
+const postMerchantWebhook = async (payload, options = {}) => {
     const webhookUrl = options.webhookUrl ?? MERCHANT_WEBHOOK_URL;
     if (!webhookUrl) {
         return { delivered: false, skipped: true, attempts: 0 };
@@ -56,21 +66,12 @@ async function postMerchantWebhook(payload, options = {}) {
 
     const fetchImpl = options.fetchImpl ?? fetch;
     const sleepImpl = options.sleep ?? sleep;
-    let lastError;
+    let lastError = null;
 
     for (let attempt = 1; attempt <= WEBHOOK_ATTEMPTS; attempt += 1) {
         try {
-            const response = await fetchImpl(webhookUrl, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-
-            if (response.ok) {
-                return { delivered: true, skipped: false, attempts: attempt };
-            }
-
-            lastError = new Error(`Merchant webhook responded ${response.status}`);
+            await sendMerchantWebhookAttempt(webhookUrl, payload, fetchImpl);
+            return { delivered: true, skipped: false, attempts: attempt };
         } catch (error) {
             lastError = error;
         }
@@ -87,9 +88,9 @@ async function postMerchantWebhook(payload, options = {}) {
         attempts: WEBHOOK_ATTEMPTS,
         error: lastError?.message || 'unknown error',
     };
-}
+};
 
-async function processEvent(event) {
+const processEvent = async (event) => {
     const { args: [buyer, orderId, amount], transactionHash, blockNumber, blockHash } = event;
     const amountUSDC = ethers.formatUnits(amount, 6);
 
@@ -134,9 +135,9 @@ async function processEvent(event) {
         txHash: transactionHash,
         timestamp: new Date().toISOString(),
     });
-}
+};
 
-async function runPoller() {
+const runPoller = async () => {
     console.log(`✅ Poller iniciado. ${CONFIRMATIONS} confirmaciones.`);
     while (true) {
         try {
@@ -163,7 +164,7 @@ async function runPoller() {
         }
         await sleep(POLL_INTERVAL_MS);
     }
-}
+};
 
 if (require.main === module) {
     console.log('🎧 ELARA Worker Poller LIVE');

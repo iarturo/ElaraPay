@@ -14,7 +14,7 @@ test('postMerchantWebhook skips when no URL is configured', async () => {
 });
 
 test('postMerchantWebhook sends the expected JSON payload', async () => {
-    let request;
+    let request = null;
     const payload = {
         orderId: 'ord_1',
         amount: 42,
@@ -25,7 +25,7 @@ test('postMerchantWebhook sends the expected JSON payload', async () => {
 
     const result = await postMerchantWebhook(payload, {
         webhookUrl: 'https://merchant.example/webhook',
-        fetchImpl: async (url, options) => {
+        fetchImpl: (url, options) => {
             request = { url, options };
             return { ok: true, status: 200 };
         },
@@ -45,8 +45,8 @@ test('postMerchantWebhook retries failed deliveries with exponential backoff', a
 
     const result = await postMerchantWebhook({ orderId: 'ord_retry' }, {
         webhookUrl: 'https://merchant.example/webhook',
-        sleep: async (ms) => sleeps.push(ms),
-        fetchImpl: async () => {
+        sleep: (ms) => sleeps.push(ms),
+        fetchImpl: () => {
             calls += 1;
             return calls < 3 ? { ok: false, status: 503 } : { ok: true, status: 200 };
         },
