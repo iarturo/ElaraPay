@@ -2,7 +2,7 @@ require('dotenv').config();
 const { ethers } = require('ethers');
 const { createClient } = require('@supabase/supabase-js');
 
-const { GATEWAY_ADDRESS, SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
+const { GATEWAY_ADDRESS, SUPABASE_URL, SUPABASE_SERVICE_KEY, MERCHANT_WEBHOOK_URL } = process.env;
 const RPC_URL = process.env.BASE_SEPOLIA_RPC_URL || process.env.ALCHEMY_HTTP || 'https://sepolia.base.org';
 
 const WebSocket = require('ws');
@@ -18,9 +18,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
 });
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 
-console.log('🎧 ELARA Worker Poller LIVE');
-console.log('Gateway:', GATEWAY_ADDRESS);
-
 const gateway = new ethers.Contract(
     GATEWAY_ADDRESS,
     ['event PaymentReceived(address indexed buyer, string orderId, uint256 amount)'],
@@ -30,8 +27,11 @@ const gateway = new ethers.Contract(
 const CONFIRMATIONS = 2;
 const POLL_INTERVAL_MS = 10_000;
 const MAX_BLOCK_RANGE = 500; // M-04: límite de batch
+const WEBHOOK_ATTEMPTS = 3;
 
-async function getWorkerState() {
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const getWorkerState = async () => {
     const { data, error } = await supabase.from('worker_state').select('last_block').eq('id', 1).single();
     if (error || !data) {
         console.log('⚠️ No state, iniciando desde bloque actual...');
@@ -40,13 +40,71 @@ async function getWorkerState() {
         return current;
     }
     return data.last_block;
-}
+};
 
-async function updateWorkerState(blockNumber) {
+const updateWorkerState = async (blockNumber) => {
     await supabase.from('worker_state').upsert({ id: 1, last_block: blockNumber });
-}
+};
 
-async function processEvent(event) {
+const sendMerchantWebhookAttempt = async (webhookUrl, payload, fetchImpl) => {
+    const response = await fetchImpl(webhookUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Merchant webhook responded ${response.status}`);
+    }
+};
+
+const tryMerchantWebhookAttempt = async (webhookUrl, payload, fetchImpl) => {
+    try {
+        await sendMerchantWebhookAttempt(webhookUrl, payload, fetchImpl);
+        return null;
+    } catch (error) {
+        return error;
+    }
+};
+
+const merchantWebhookFailure = (lastError) => {
+    return {
+        delivered: false,
+        skipped: false,
+        attempts: WEBHOOK_ATTEMPTS,
+        error: lastError?.message || 'unknown error',
+    };
+};
+
+const retryMerchantWebhook = async (webhookUrl, payload, fetchImpl, sleepImpl, attempt = 1) => {
+    const error = await tryMerchantWebhookAttempt(webhookUrl, payload, fetchImpl);
+    if (!error) {
+        return { delivered: true, skipped: false, attempts: attempt };
+    }
+
+    if (attempt >= WEBHOOK_ATTEMPTS) {
+        return merchantWebhookFailure(error);
+    }
+
+    await sleepImpl(1000 * (2 ** (attempt - 1)));
+    return retryMerchantWebhook(webhookUrl, payload, fetchImpl, sleepImpl, attempt + 1);
+};
+
+const postMerchantWebhook = (payload, options = {}) => {
+    const webhookUrl = options.webhookUrl ?? MERCHANT_WEBHOOK_URL;
+    if (!webhookUrl) {
+        return { delivered: false, skipped: true, attempts: 0 };
+    }
+
+    return retryMerchantWebhook(
+        webhookUrl,
+        payload,
+        options.fetchImpl ?? fetch,
+        options.sleep ?? sleep
+    );
+};
+
+const processEvent = async (event) => {
     const { args: [buyer, orderId, amount], transactionHash, blockNumber, blockHash } = event;
     const amountUSDC = ethers.formatUnits(amount, 6);
 
@@ -66,7 +124,7 @@ async function processEvent(event) {
 
     console.log(`\n💰 Pago: ${amountUSDC} USDC | Orden: ${orderId} | ${buyer.slice(0, 8)}...`);
 
-    await supabase.from('payments').insert({
+    const payment = {
         payer: buyer.toLowerCase(),
         amount: parseFloat(amountUSDC),
         token: 'USDC',
@@ -77,10 +135,23 @@ async function processEvent(event) {
         chain: 'base-sepolia',
         status: 'confirmed',
         order_id: orderId
-    });
-}
+    };
 
-async function runPoller() {
+    const { error } = await supabase.from('payments').insert(payment);
+    if (error) {
+        throw new Error(`Failed to index payment ${transactionHash}: ${error.message}`);
+    }
+
+    await postMerchantWebhook({
+        orderId,
+        amount: payment.amount,
+        buyer: payment.payer,
+        txHash: transactionHash,
+        timestamp: new Date().toISOString(),
+    });
+};
+
+const runPoller = async () => {
     console.log(`✅ Poller iniciado. ${CONFIRMATIONS} confirmaciones.`);
     while (true) {
         try {
@@ -105,8 +176,15 @@ async function runPoller() {
         } catch (error) {
             console.error('❌ Error en poller:', error.message);
         }
-        await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+        await sleep(POLL_INTERVAL_MS);
     }
+};
+
+if (require.main === module) {
+    runPoller();
 }
 
-runPoller();
+module.exports = {
+    postMerchantWebhook,
+    processEvent,
+};
