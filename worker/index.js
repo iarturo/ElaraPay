@@ -67,21 +67,7 @@ const tryMerchantWebhookAttempt = async (webhookUrl, payload, fetchImpl) => {
     }
 };
 
-const retryMerchantWebhook = async (webhookUrl, payload, fetchImpl, sleepImpl) => {
-    let lastError = null;
-
-    for (let attempt = 1; attempt <= WEBHOOK_ATTEMPTS; attempt += 1) {
-        lastError = await tryMerchantWebhookAttempt(webhookUrl, payload, fetchImpl);
-        if (!lastError) {
-            return { delivered: true, skipped: false, attempts: attempt };
-        }
-
-        if (attempt < WEBHOOK_ATTEMPTS) {
-            await sleepImpl(1000 * (2 ** (attempt - 1)));
-        }
-    }
-
-    console.warn(`⚠️ Merchant webhook failed after ${WEBHOOK_ATTEMPTS} attempts: ${lastError?.message || 'unknown error'}`);
+const merchantWebhookFailure = (lastError) => {
     return {
         delivered: false,
         skipped: false,
@@ -90,7 +76,21 @@ const retryMerchantWebhook = async (webhookUrl, payload, fetchImpl, sleepImpl) =
     };
 };
 
-const postMerchantWebhook = async (payload, options = {}) => {
+const retryMerchantWebhook = async (webhookUrl, payload, fetchImpl, sleepImpl, attempt = 1) => {
+    const error = await tryMerchantWebhookAttempt(webhookUrl, payload, fetchImpl);
+    if (!error) {
+        return { delivered: true, skipped: false, attempts: attempt };
+    }
+
+    if (attempt >= WEBHOOK_ATTEMPTS) {
+        return merchantWebhookFailure(error);
+    }
+
+    await sleepImpl(1000 * (2 ** (attempt - 1)));
+    return retryMerchantWebhook(webhookUrl, payload, fetchImpl, sleepImpl, attempt + 1);
+};
+
+const postMerchantWebhook = (payload, options = {}) => {
     const webhookUrl = options.webhookUrl ?? MERCHANT_WEBHOOK_URL;
     if (!webhookUrl) {
         return { delivered: false, skipped: true, attempts: 0 };
